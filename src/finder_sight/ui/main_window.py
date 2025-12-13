@@ -7,8 +7,8 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QLabel, QFileDialog, 
                              QListWidget, QProgressBar, QMessageBox, QStyle,
                              QFrame, QSizePolicy)
-from PyQt6.QtCore import Qt, QBuffer, QIODevice, QSize, QKeySequence
-from PyQt6.QtGui import QPixmap, QDragEnterEvent, QDropEvent, QImageReader
+from PyQt6.QtCore import Qt, QBuffer, QIODevice, QSize
+from PyQt6.QtGui import QPixmap, QDragEnterEvent, QDropEvent, QImageReader, QKeySequence
 from PIL import Image
 import imagehash
 

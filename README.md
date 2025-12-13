@@ -45,7 +45,7 @@ A macOS desktop application for "Reverse Image Search" that helps you find local
 
 1. **Run the application**
    ```bash
-   python main.py
+   python run.py
    ```
 
 2. **Build Index**
