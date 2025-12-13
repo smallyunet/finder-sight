@@ -12,10 +12,11 @@ from PyQt6.QtGui import QPixmap, QDragEnterEvent, QDropEvent, QImageReader, QKey
 from PIL import Image
 import imagehash
 
-from src.finder_sight.constants import INDEX_FILE, CONFIG_FILE
+from src.finder_sight.constants import INDEX_FILE, CONFIG_FILE, THUMBNAIL_SIZE
 from src.finder_sight.core.indexer import IndexerThread
 from src.finder_sight.core.searcher import SearchThread
 from src.finder_sight.ui.widgets import DropLabel, ClickableLabel
+from src.finder_sight.utils.logger import logger
 
 class ImageFinderApp(QMainWindow):
     def __init__(self):
@@ -89,7 +90,7 @@ class ImageFinderApp(QMainWindow):
         result_layout.addWidget(QLabel("Search Results (Double click to reveal):"))
 
         self.result_list = QListWidget()
-        self.result_list.setIconSize(QSize(100, 100))
+        self.result_list.setIconSize(QSize(THUMBNAIL_SIZE, THUMBNAIL_SIZE))
         self.result_list.itemDoubleClicked.connect(self.on_result_double_clicked)
         
         result_layout.addWidget(self.result_list)
@@ -125,7 +126,17 @@ class ImageFinderApp(QMainWindow):
         self.indexer_thread = IndexerThread(self.directories, self.image_index)
         self.indexer_thread.progress_update.connect(self.update_progress)
         self.indexer_thread.finished.connect(self.indexing_finished)
+        self.indexer_thread.deleted_files.connect(self.on_deleted_files_found)
         self.indexer_thread.start()
+
+    def on_deleted_files_found(self, deleted_paths: list[str]) -> None:
+        """Handle notification of deleted files from indexer."""
+        for path in deleted_paths:
+            if path in self.image_index:
+                del self.image_index[path]
+            if path in self.image_hashes:
+                del self.image_hashes[path]
+        logger.info(f"Removed {len(deleted_paths)} deleted files from index")
 
     def update_progress(self, current, total, current_file):
         self.progress_bar.setMaximum(total)
@@ -134,11 +145,16 @@ class ImageFinderApp(QMainWindow):
 
     def indexing_finished(self, index_data):
         # Update hash cache
+        hash_load_failures = 0
         for path, hash_str in index_data.items():
             try:
                 self.image_hashes[path] = imagehash.hex_to_multihash(hash_str)
-            except:
-                pass
+            except Exception as e:
+                hash_load_failures += 1
+                logger.debug(f"Failed to parse hash for {path}: {e}")
+        
+        if hash_load_failures > 0:
+            logger.warning(f"{hash_load_failures} hashes failed to load")
                 
         self.image_index.update(index_data)
         self.save_index()
@@ -146,14 +162,16 @@ class ImageFinderApp(QMainWindow):
         self.progress_bar.setVisible(False)
         self.lbl_status.setText(f"Indexing complete. Total images: {len(self.image_index)}")
         QMessageBox.information(self, "Done", f"Indexed {len(index_data)} new images.")
+        logger.info(f"Indexing finished: {len(index_data)} new images indexed")
 
     def save_index(self):
         try:
             with open(INDEX_FILE, 'w') as f:
                 json.dump(self.image_index, f)
+            logger.debug(f"Index saved with {len(self.image_index)} entries")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save index: {e}")
-            print(f"Failed to save index: {e}")
+            logger.error(f"Failed to save index: {e}")
 
     def load_index(self):
         if os.path.exists(INDEX_FILE):
@@ -163,24 +181,32 @@ class ImageFinderApp(QMainWindow):
                 
                 # Pre-calculate hashes for faster search
                 self.image_hashes = {}
+                hash_load_failures = 0
                 for path, hash_str in self.image_index.items():
                     try:
                         self.image_hashes[path] = imagehash.hex_to_multihash(hash_str)
-                    except:
+                    except Exception as e:
+                        hash_load_failures += 1
+                        logger.debug(f"Failed to parse hash for {path}: {e}")
                         continue
+                
+                if hash_load_failures > 0:
+                    logger.warning(f"{hash_load_failures} hashes failed to load from index")
                         
                 self.lbl_status.setText(f"Loaded index with {len(self.image_index)} images.")
+                logger.info(f"Loaded index with {len(self.image_index)} images")
             except Exception as e:
                 QMessageBox.warning(self, "Warning", f"Failed to load index: {e}\nStarting with empty index.")
-                print(f"Failed to load index: {e}")
+                logger.error(f"Failed to load index: {e}")
 
     def save_config(self):
         try:
             with open(CONFIG_FILE, 'w') as f:
                 json.dump({"directories": self.directories}, f)
+            logger.debug("Config saved")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save config: {e}")
-            print(f"Failed to save config: {e}")
+            logger.error(f"Failed to save config: {e}")
 
     def load_config(self):
         if os.path.exists(CONFIG_FILE):
@@ -190,9 +216,10 @@ class ImageFinderApp(QMainWindow):
                     self.directories = data.get("directories", [])
                     for d in self.directories:
                         self.dir_list.addItem(d)
+                logger.debug(f"Config loaded with {len(self.directories)} directories")
             except Exception as e:
                 QMessageBox.warning(self, "Warning", f"Failed to load config: {e}")
-                print(f"Failed to load config: {e}")
+                logger.error(f"Failed to load config: {e}")
 
     # --- Drag & Drop Implementation ---
     def dragEnterEvent(self, event: QDragEnterEvent):
@@ -281,7 +308,7 @@ class ImageFinderApp(QMainWindow):
             
             # Load thumbnail
             reader = QImageReader(path)
-            reader.setScaledSize(QSize(100, 100))
+            reader.setScaledSize(QSize(THUMBNAIL_SIZE, THUMBNAIL_SIZE))
             img = reader.read()
             if not img.isNull():
                 item.setIcon(QIcon(QPixmap.fromImage(img)))
