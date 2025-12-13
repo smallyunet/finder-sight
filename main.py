@@ -3,11 +3,12 @@ import os
 import json
 import subprocess
 import typing
+from concurrent.futures import ProcessPoolExecutor
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFileDialog, 
                              QListWidget, QProgressBar, QMessageBox, QStyle,
                              QFrame, QSizePolicy)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QBuffer, QIODevice, QSize
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QBuffer, QIODevice, QSize, QSettings
 from PyQt6.QtGui import QPixmap, QImage, QDragEnterEvent, QDropEvent, QAction, QKeySequence, QIcon, QImageReader
 from PIL import Image
 import imagehash
@@ -15,12 +16,22 @@ import io
 
 # Constants
 INDEX_FILE = "image_index.json"
+CONFIG_FILE = "config.json"
 SUPPORTED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.bmp'}
-HASH_THRESHOLD = 5
+
+# Top-level function for multiprocessing
+def calculate_hash(file_path):
+    try:
+        with Image.open(file_path) as img:
+            # crop_resistant_hash is computationally expensive
+            h = imagehash.crop_resistant_hash(img)
+            return file_path, str(h)
+    except Exception as e:
+        return file_path, None
 
 class IndexerThread(QThread):
     """
-    Background thread: Used to traverse directories and calculate image hashes
+    Background thread: Uses ProcessPoolExecutor for parallel hashing
     """
     progress_update = pyqtSignal(int, int, str) # current, total, current_file
     finished = pyqtSignal(dict)
@@ -33,7 +44,7 @@ class IndexerThread(QThread):
 
     def run(self):
         image_files = []
-        # 1. Scan all files
+        # 1. Scan all files (Fast, IO bound)
         for directory in self.directories:
             for root, _, files in os.walk(directory):
                 for file in files:
@@ -41,34 +52,88 @@ class IndexerThread(QThread):
                         return
                     if os.path.splitext(file)[1].lower() in SUPPORTED_EXTENSIONS:
                         full_path = os.path.join(root, file)
-                        # Skip if already indexed
                         if full_path not in self.existing_index:
                             image_files.append(full_path)
         
         total_files = len(image_files)
         index_data = {}
         
-        # 2. Calculate hashes
-        for i, file_path in enumerate(image_files):
-            if not self.is_running:
-                return
+        if total_files == 0:
+            self.finished.emit({})
+            return
+
+        # 2. Calculate hashes in parallel (CPU bound)
+        # Use max_workers=None to let it default to CPU count
+        with ProcessPoolExecutor() as executor:
+            # Map returns an iterator that yields results as they complete if we iterate, 
+            # but here we want to track progress, so we submit tasks.
+            futures = []
+            for file_path in image_files:
+                if not self.is_running:
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    return
+                future = executor.submit(calculate_hash, file_path)
+                futures.append(future)
             
-            try:
-                # Use crop_resistant_hash for partial image matching
-                with Image.open(file_path) as img:
-                    h = imagehash.crop_resistant_hash(img)
-                    index_data[file_path] = str(h)
-            except Exception as e:
-                print(f"Error indexing {file_path}: {e}")
-            
-            # Throttle updates to avoid UI freeze
-            if i % 10 == 0 or i == total_files - 1:
+            for i, future in enumerate(futures):
+                if not self.is_running:
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    return
+                
+                file_path, hash_str = future.result()
+                if hash_str:
+                    index_data[file_path] = hash_str
+                
+                # Emit progress
                 self.progress_update.emit(i + 1, total_files, file_path)
-            
+
         self.finished.emit(index_data)
 
     def stop(self):
         self.is_running = False
+
+class SearchThread(QThread):
+    """
+    Background thread for searching to prevent UI freeze
+    """
+    finished = pyqtSignal(str, int, float) # path, matches, distance (or None if not found)
+    error = pyqtSignal(str)
+
+    def __init__(self, image_hashes, target_hash):
+        super().__init__()
+        self.image_hashes = image_hashes
+        self.target_hash = target_hash
+
+    def run(self):
+        best_match_path = None
+        max_matches = 0
+        min_dist = float('inf')
+
+        try:
+            for path, h in self.image_hashes.items():
+                if self.isInterruptionRequested():
+                    return
+
+                try:
+                    matches, dist = h.hash_diff(self.target_hash)
+                    if matches > max_matches:
+                        max_matches = matches
+                        min_dist = dist
+                        best_match_path = path
+                    elif matches == max_matches and matches > 0:
+                        if dist < min_dist:
+                            min_dist = dist
+                            best_match_path = path
+                except:
+                    continue
+            
+            if best_match_path and max_matches > 0:
+                self.finished.emit(best_match_path, max_matches, min_dist)
+            else:
+                self.finished.emit(None, 0, 0.0)
+
+        except Exception as e:
+            self.error.emit(str(e))
 
 class DropLabel(QLabel):
     dropped = pyqtSignal(str)
@@ -99,11 +164,13 @@ class ImageFinderApp(QMainWindow):
         self.setAcceptDrops(True) 
         
         self.image_index = {}
-        self.image_hashes = {} # Cache for ImageHash objects
+        self.image_hashes = {} 
         self.directories = []
         self.indexer_thread = None
+        self.search_thread = None
         
         self.init_ui()
+        self.load_config()
         self.load_index()
 
     def init_ui(self):
@@ -167,6 +234,7 @@ class ImageFinderApp(QMainWindow):
         self.lbl_result_thumb.setFixedSize(100, 100)
         self.lbl_result_thumb.setStyleSheet("border: 1px solid #ccc; background: #eee;")
         self.lbl_result_thumb.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_result_thumb.setScaledContents(True)
         
         result_info_layout = QVBoxLayout()
         self.lbl_result_text = QLabel("No result")
@@ -192,17 +260,18 @@ class ImageFinderApp(QMainWindow):
             if dir_path not in self.directories:
                 self.directories.append(dir_path)
                 self.dir_list.addItem(dir_path)
+                self.save_config()
 
     def start_indexing(self):
         if not self.directories:
-            QMessageBox.warning(self, "Warning", "Please add, self.image_index at least one directory.")
+            QMessageBox.warning(self, "Warning", "Please add at least one directory.")
             return
             
         self.btn_index.setEnabled(False)
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
         
-        self.indexer_thread = IndexerThread(self.directories)
+        self.indexer_thread = IndexerThread(self.directories, self.image_index)
         self.indexer_thread.progress_update.connect(self.update_progress)
         self.indexer_thread.finished.connect(self.indexing_finished)
         self.indexer_thread.start()
@@ -252,6 +321,24 @@ class ImageFinderApp(QMainWindow):
             except Exception as e:
                 print(f"Failed to load index: {e}")
 
+    def save_config(self):
+        try:
+            with open(CONFIG_FILE, 'w') as f:
+                json.dump({"directories": self.directories}, f)
+        except Exception as e:
+            print(f"Failed to save config: {e}")
+
+    def load_config(self):
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, 'r') as f:
+                    data = json.load(f)
+                    self.directories = data.get("directories", [])
+                    for d in self.directories:
+                        self.dir_list.addItem(d)
+            except Exception as e:
+                print(f"Failed to load config: {e}")
+
     # --- Drag & Drop Implementation ---
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
@@ -287,14 +374,19 @@ class ImageFinderApp(QMainWindow):
             QMessageBox.warning(self, "Warning", "Index is empty. Please index some directories first.")
             return
 
+        # Cancel previous search if running
+        if self.search_thread and self.search_thread.isRunning():
+            self.search_thread.requestInterruption()
+            self.search_thread.wait()
+
         target_hash = None
         try:
             if file_path:
-                self.lbl_status.setText(f"Searching for: {os.path.basename(file_path)}...")
+                self.lbl_status.setText(f"Processing: {os.path.basename(file_path)}...")
                 with Image.open(file_path) as img:
                     target_hash = imagehash.crop_resistant_hash(img)
             elif image_data:
-                self.lbl_status.setText("Searching for pasted image...")
+                self.lbl_status.setText("Processing pasted image...")
                 # Convert QImage to PIL Image
                 buffer = QBuffer()
                 buffer.open(QIODevice.OpenModeFlag.ReadWrite)
@@ -308,43 +400,44 @@ class ImageFinderApp(QMainWindow):
         if target_hash is None:
             return
 
-        # Find best match
-        best_match_path = None
-        max_matches = 0
-        min_dist = float('inf')
+        self.lbl_status.setText("Searching...")
+        self.drop_zone.setText("Searching...")
+        self.drop_zone.setStyleSheet("QLabel { background-color: #e6f3ff; border: 2px solid #2196F3; }")
+        
+        # Start background search
+        self.search_thread = SearchThread(self.image_hashes, target_hash)
+        self.search_thread.finished.connect(self.on_search_finished)
+        self.search_thread.error.connect(lambda e: QMessageBox.critical(self, "Error", e))
+        self.search_thread.start()
 
-        # Iterate through pre-calculated hashes
-        for path, h in self.image_hashes.items():
-            try:
-                # hash_diff returns (matches, distance)
-                # matches: number of segments in query that matched segments in db image
-                matches, dist = h.hash_diff(target_hash)
-                
-                # We prioritize number of matches, then lower distance
-                if matches > max_matches:
-                    max_matches = matches
-                    min_dist = dist
-                    best_match_path = path
-                elif matches == max_matches and matches > 0:
-                    if dist < min_dist:
-                        min_dist = dist
-                        best_match_path = path
-            except:
-                continue
+    def on_search_finished(self, path, matches, dist):
+        self.drop_zone.setText("Drag & Drop Image Here\nor Paste (Cmd+V)")
+        self.drop_zone.setStyleSheet("""
+            QLabel {
+                border: 2px dashed #aaa;
+                border-radius: 10px;
+                font-size: 24px;
+                color: #555;
+                background-color: #f9f9f9;
+            }
+            QLabel:hover {
+                background-color: #f0f0f0;
+                border-color: #888;
+            }
+        """)
 
-        if best_match_path and max_matches > 0:
-            self.show_result(best_match_path, f"Matches: {max_matches}, Dist: {min_dist}")
+        if path:
+            self.show_result(path, f"Matches: {matches}, Dist: {dist}")
         else:
             self.show_no_result()
 
     def show_result(self, path, dist):
         self.current_result_path = path
-        self.lbl_result_text.setText(f"Found: {os.path.basename(path)}\nPath: {path}\nDistance: {dist}")
+        self.lbl_result_text.setText(f"Found: {os.path.basename(path)}\nPath: {path}\nScore: {dist}")
         self.btn_reveal.setEnabled(True)
         
         # Show thumbnail efficiently using QImageReader
         reader = QImageReader(path)
-        # Scale to slightly larger than target size to maintain quality, then let QLabel handle final scaling or scale here
         reader.setScaledSize(QSize(100, 100)) 
         img = reader.read()
         
@@ -360,7 +453,7 @@ class ImageFinderApp(QMainWindow):
         self.lbl_result_text.setText("No matching image found.")
         self.btn_reveal.setEnabled(False)
         self.lbl_result_thumb.clear()
-        self.lbl_status.setText("Search finished.")
+        self.lbl_status.setText("Search finished. No match.")
 
     def reveal_current_result(self):
         if self.current_result_path:
