@@ -1,0 +1,6 @@
+PyQt6
+Pillow
+ImageHash
+pytest
+pytest-qt
+
