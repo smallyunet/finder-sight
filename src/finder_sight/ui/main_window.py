@@ -2,159 +2,20 @@ import sys
 import os
 import json
 import subprocess
-import typing
-from concurrent.futures import ProcessPoolExecutor
+import io
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFileDialog, 
                              QListWidget, QProgressBar, QMessageBox, QStyle,
                              QFrame, QSizePolicy)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QBuffer, QIODevice, QSize, QSettings
-from PyQt6.QtGui import QPixmap, QImage, QDragEnterEvent, QDropEvent, QAction, QKeySequence, QIcon, QImageReader
+from PyQt6.QtCore import Qt, QBuffer, QIODevice, QSize, QKeySequence
+from PyQt6.QtGui import QPixmap, QDragEnterEvent, QDropEvent, QImageReader
 from PIL import Image
 import imagehash
-import io
 
-# Constants
-INDEX_FILE = "image_index.json"
-CONFIG_FILE = "config.json"
-SUPPORTED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.bmp'}
-
-# Top-level function for multiprocessing
-def calculate_hash(file_path):
-    try:
-        with Image.open(file_path) as img:
-            # crop_resistant_hash is computationally expensive
-            h = imagehash.crop_resistant_hash(img)
-            return file_path, str(h)
-    except Exception as e:
-        return file_path, None
-
-class IndexerThread(QThread):
-    """
-    Background thread: Uses ProcessPoolExecutor for parallel hashing
-    """
-    progress_update = pyqtSignal(int, int, str) # current, total, current_file
-    finished = pyqtSignal(dict)
-
-    def __init__(self, directories, existing_index=None):
-        super().__init__()
-        self.directories = directories
-        self.existing_index = existing_index or {}
-        self.is_running = True
-
-    def run(self):
-        image_files = []
-        # 1. Scan all files (Fast, IO bound)
-        for directory in self.directories:
-            for root, _, files in os.walk(directory):
-                for file in files:
-                    if not self.is_running:
-                        return
-                    if os.path.splitext(file)[1].lower() in SUPPORTED_EXTENSIONS:
-                        full_path = os.path.join(root, file)
-                        if full_path not in self.existing_index:
-                            image_files.append(full_path)
-        
-        total_files = len(image_files)
-        index_data = {}
-        
-        if total_files == 0:
-            self.finished.emit({})
-            return
-
-        # 2. Calculate hashes in parallel (CPU bound)
-        # Use max_workers=None to let it default to CPU count
-        with ProcessPoolExecutor() as executor:
-            # Map returns an iterator that yields results as they complete if we iterate, 
-            # but here we want to track progress, so we submit tasks.
-            futures = []
-            for file_path in image_files:
-                if not self.is_running:
-                    executor.shutdown(wait=False, cancel_futures=True)
-                    return
-                future = executor.submit(calculate_hash, file_path)
-                futures.append(future)
-            
-            for i, future in enumerate(futures):
-                if not self.is_running:
-                    executor.shutdown(wait=False, cancel_futures=True)
-                    return
-                
-                file_path, hash_str = future.result()
-                if hash_str:
-                    index_data[file_path] = hash_str
-                
-                # Emit progress
-                self.progress_update.emit(i + 1, total_files, file_path)
-
-        self.finished.emit(index_data)
-
-    def stop(self):
-        self.is_running = False
-
-class SearchThread(QThread):
-    """
-    Background thread for searching to prevent UI freeze
-    """
-    finished = pyqtSignal(str, int, float) # path, matches, distance (or None if not found)
-    error = pyqtSignal(str)
-
-    def __init__(self, image_hashes, target_hash):
-        super().__init__()
-        self.image_hashes = image_hashes
-        self.target_hash = target_hash
-
-    def run(self):
-        best_match_path = None
-        max_matches = 0
-        min_dist = float('inf')
-
-        try:
-            for path, h in self.image_hashes.items():
-                if self.isInterruptionRequested():
-                    return
-
-                try:
-                    matches, dist = h.hash_diff(self.target_hash)
-                    if matches > max_matches:
-                        max_matches = matches
-                        min_dist = dist
-                        best_match_path = path
-                    elif matches == max_matches and matches > 0:
-                        if dist < min_dist:
-                            min_dist = dist
-                            best_match_path = path
-                except:
-                    continue
-            
-            if best_match_path and max_matches > 0:
-                self.finished.emit(best_match_path, max_matches, min_dist)
-            else:
-                self.finished.emit(None, 0, 0.0)
-
-        except Exception as e:
-            self.error.emit(str(e))
-
-class DropLabel(QLabel):
-    dropped = pyqtSignal(str)
-
-    def __init__(self, title):
-        super().__init__(title)
-        self.setAcceptDrops(True)
-
-    def dragEnterEvent(self, event: QDragEnterEvent):
-        if event.mimeData().hasUrls():
-            event.acceptProposedAction()
-            
-    def dragMoveEvent(self, event):
-        if event.mimeData().hasUrls():
-            event.acceptProposedAction()
-
-    def dropEvent(self, event: QDropEvent):
-        urls = event.mimeData().urls()
-        if urls:
-            file_path = urls[0].toLocalFile()
-            self.dropped.emit(file_path)
+from src.finder_sight.constants import INDEX_FILE, CONFIG_FILE
+from src.finder_sight.core.indexer import IndexerThread
+from src.finder_sight.core.searcher import SearchThread
+from src.finder_sight.ui.widgets import DropLabel
 
 class ImageFinderApp(QMainWindow):
     def __init__(self):
@@ -471,9 +332,3 @@ class ImageFinderApp(QMainWindow):
                 subprocess.run(['explorer', '/select,', os.path.normpath(path)])
             else:
                 subprocess.run(['xdg-open', os.path.dirname(path)])
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = ImageFinderApp()
-    window.show()
-    sys.exit(app.exec())

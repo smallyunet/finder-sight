@@ -7,10 +7,11 @@ import imagehash
 import tempfile
 import shutil
 
-# Add parent directory to path to import main
+# Add parent directory to path to import src
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from main import IndexerThread, SUPPORTED_EXTENSIONS
+from src.finder_sight.core.indexer import IndexerThread
+from src.finder_sight.constants import SUPPORTED_EXTENSIONS
 
 @pytest.fixture
 def temp_image_dir():
