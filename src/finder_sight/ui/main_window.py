@@ -21,7 +21,7 @@ class ImageFinderApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("macOS Image Finder")
-        self.resize(800, 600)
+        self.setMinimumSize(800, 600)
         self.setAcceptDrops(True) 
         
         self.image_index = {}
@@ -152,6 +152,7 @@ class ImageFinderApp(QMainWindow):
             with open(INDEX_FILE, 'w') as f:
                 json.dump(self.image_index, f)
         except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save index: {e}")
             print(f"Failed to save index: {e}")
 
     def load_index(self):
@@ -170,6 +171,7 @@ class ImageFinderApp(QMainWindow):
                         
                 self.lbl_status.setText(f"Loaded index with {len(self.image_index)} images.")
             except Exception as e:
+                QMessageBox.warning(self, "Warning", f"Failed to load index: {e}\nStarting with empty index.")
                 print(f"Failed to load index: {e}")
 
     def save_config(self):
@@ -177,6 +179,7 @@ class ImageFinderApp(QMainWindow):
             with open(CONFIG_FILE, 'w') as f:
                 json.dump({"directories": self.directories}, f)
         except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save config: {e}")
             print(f"Failed to save config: {e}")
 
     def load_config(self):
@@ -188,6 +191,7 @@ class ImageFinderApp(QMainWindow):
                     for d in self.directories:
                         self.dir_list.addItem(d)
             except Exception as e:
+                QMessageBox.warning(self, "Warning", f"Failed to load config: {e}")
                 print(f"Failed to load config: {e}")
 
     # --- Drag & Drop Implementation ---
