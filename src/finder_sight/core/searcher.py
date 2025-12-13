@@ -4,18 +4,17 @@ class SearchThread(QThread):
     """
     Background thread for searching to prevent UI freeze
     """
-    finished = pyqtSignal(str, int, float) # path, matches, distance (or None if not found)
+    finished = pyqtSignal(list) # list of (path, matches, distance)
     error = pyqtSignal(str)
 
-    def __init__(self, image_hashes, target_hash):
+    def __init__(self, image_hashes, target_hash, max_results=20):
         super().__init__()
         self.image_hashes = image_hashes
         self.target_hash = target_hash
+        self.max_results = max_results
 
     def run(self):
-        best_match_path = None
-        max_matches = 0
-        min_dist = float('inf')
+        results = []
 
         try:
             for path, h in self.image_hashes.items():
@@ -24,21 +23,16 @@ class SearchThread(QThread):
 
                 try:
                     matches, dist = h.hash_diff(self.target_hash)
-                    if matches > max_matches:
-                        max_matches = matches
-                        min_dist = dist
-                        best_match_path = path
-                    elif matches == max_matches and matches > 0:
-                        if dist < min_dist:
-                            min_dist = dist
-                            best_match_path = path
+                    if matches > 0:
+                        results.append((path, matches, dist))
                 except:
                     continue
             
-            if best_match_path and max_matches > 0:
-                self.finished.emit(best_match_path, max_matches, min_dist)
-            else:
-                self.finished.emit(None, 0, 0.0)
+            # Sort by matches (desc) then distance (asc)
+            results.sort(key=lambda x: (-x[1], x[2]))
+            
+            # Return top N results
+            self.finished.emit(results[:self.max_results])
 
         except Exception as e:
             self.error.emit(str(e))

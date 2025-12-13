@@ -6,9 +6,9 @@ import io
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFileDialog, 
                              QListWidget, QProgressBar, QMessageBox, QStyle,
-                             QFrame, QSizePolicy)
+                             QFrame, QSizePolicy, QListWidgetItem)
 from PyQt6.QtCore import Qt, QBuffer, QIODevice, QSize
-from PyQt6.QtGui import QPixmap, QDragEnterEvent, QDropEvent, QImageReader, QKeySequence
+from PyQt6.QtGui import QPixmap, QDragEnterEvent, QDropEvent, QImageReader, QKeySequence, QIcon
 from PIL import Image
 import imagehash
 
@@ -84,32 +84,17 @@ class ImageFinderApp(QMainWindow):
 
         result_group = QFrame()
         result_group.setFrameShape(QFrame.Shape.StyledPanel)
-        result_layout = QHBoxLayout(result_group)
+        result_layout = QVBoxLayout(result_group)
         
-        self.lbl_result_thumb = ClickableLabel()
-        self.lbl_result_thumb.clicked.connect(self.reveal_current_result)
-        self.lbl_result_thumb.setFixedSize(100, 100)
-        self.lbl_result_thumb.setStyleSheet("border: 1px solid #ccc; background: #eee;")
-        self.lbl_result_thumb.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_result_thumb.setScaledContents(True)
+        result_layout.addWidget(QLabel("Search Results (Double click to reveal):"))
+
+        self.result_list = QListWidget()
+        self.result_list.setIconSize(QSize(100, 100))
+        self.result_list.itemDoubleClicked.connect(self.on_result_double_clicked)
         
-        result_info_layout = QVBoxLayout()
-        self.lbl_result_text = QLabel("No result")
-        self.lbl_result_text.setWordWrap(True)
-        self.btn_reveal = QPushButton("Reveal in Finder")
-        self.btn_reveal.setEnabled(False)
-        self.btn_reveal.clicked.connect(self.reveal_current_result)
-        
-        result_info_layout.addWidget(self.lbl_result_text)
-        result_info_layout.addWidget(self.btn_reveal)
-        result_info_layout.addStretch()
-        
-        result_layout.addWidget(self.lbl_result_thumb)
-        result_layout.addLayout(result_info_layout)
+        result_layout.addWidget(self.result_list)
         
         layout.addWidget(result_group)
-        
-        self.current_result_path = None
 
     def add_directory(self):
         dir_path = QFileDialog.getExistingDirectory(self, "Select Directory")
@@ -275,41 +260,34 @@ class ImageFinderApp(QMainWindow):
         self.search_thread.error.connect(lambda e: QMessageBox.critical(self, "Error", e))
         self.search_thread.start()
 
-    def on_search_finished(self, path, matches, dist):
+    def on_search_finished(self, results):
         self.drop_zone.set_searching(False)
+        self.result_list.clear()
 
-        if path:
-            self.show_result(path, f"Matches: {matches}, Dist: {dist}")
-        else:
-            self.show_no_result()
+        if not results:
+            self.lbl_status.setText("Search finished. No match.")
+            return
 
-    def show_result(self, path, dist):
-        self.current_result_path = path
-        self.lbl_result_text.setText(f"Found: {os.path.basename(path)}\nPath: {path}\nScore: {dist}")
-        self.btn_reveal.setEnabled(True)
+        self.lbl_status.setText(f"Found {len(results)} matches.")
         
-        # Show thumbnail efficiently using QImageReader
-        reader = QImageReader(path)
-        reader.setScaledSize(QSize(100, 100)) 
-        img = reader.read()
-        
-        if not img.isNull():
-            self.lbl_result_thumb.setPixmap(QPixmap.fromImage(img))
-        else:
-            self.lbl_result_thumb.setText("No Preview")
+        for path, matches, dist in results:
+            item = QListWidgetItem()
+            item.setText(f"{os.path.basename(path)}\nScore: {dist:.2f} (Matches: {matches})")
+            item.setData(Qt.ItemDataRole.UserRole, path)
             
-        self.lbl_status.setText("Match found!")
+            # Load thumbnail
+            reader = QImageReader(path)
+            reader.setScaledSize(QSize(100, 100))
+            img = reader.read()
+            if not img.isNull():
+                item.setIcon(QIcon(QPixmap.fromImage(img)))
+            
+            self.result_list.addItem(item)
 
-    def show_no_result(self):
-        self.current_result_path = None
-        self.lbl_result_text.setText("No matching image found.")
-        self.btn_reveal.setEnabled(False)
-        self.lbl_result_thumb.clear()
-        self.lbl_status.setText("Search finished. No match.")
-
-    def reveal_current_result(self):
-        if self.current_result_path:
-            self.reveal_in_finder(self.current_result_path)
+    def on_result_double_clicked(self, item):
+        path = item.data(Qt.ItemDataRole.UserRole)
+        if path:
+            self.reveal_in_finder(path)
 
     def reveal_in_finder(self, path):
         """
