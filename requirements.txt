@@ -3,4 +3,5 @@ Pillow
 ImageHash
 pytest
 pytest-qt
+pyinstaller
 
