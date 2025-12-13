@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QListWidget, QProgressBar, QMessageBox, QStyle,
                              QFrame, QSizePolicy)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QBuffer, QIODevice, QSize
-from PyQt6.QtGui import QPixmap, QImage, QDragEnterEvent, QDropEvent, QAction, QKeySequence, QIcon
+from PyQt6.QtGui import QPixmap, QImage, QDragEnterEvent, QDropEvent, QAction, QKeySequence, QIcon, QImageReader
 from PIL import Image
 import imagehash
 import io
@@ -20,20 +20,19 @@ HASH_THRESHOLD = 5
 
 class IndexerThread(QThread):
     """
-    后台线程：用于遍历目录并计算图片哈希值
     Background thread: Used to traverse directories and calculate image hashes
     """
     progress_update = pyqtSignal(int, int, str) # current, total, current_file
     finished = pyqtSignal(dict)
 
-    def __init__(self, directories):
+    def __init__(self, directories, existing_index=None):
         super().__init__()
         self.directories = directories
+        self.existing_index = existing_index or {}
         self.is_running = True
 
     def run(self):
         image_files = []
-        # 1. 扫描所有文件
         # 1. Scan all files
         for directory in self.directories:
             for root, _, files in os.walk(directory):
@@ -41,27 +40,30 @@ class IndexerThread(QThread):
                     if not self.is_running:
                         return
                     if os.path.splitext(file)[1].lower() in SUPPORTED_EXTENSIONS:
-                        image_files.append(os.path.join(root, file))
+                        full_path = os.path.join(root, file)
+                        # Skip if already indexed
+                        if full_path not in self.existing_index:
+                            image_files.append(full_path)
         
         total_files = len(image_files)
         index_data = {}
         
-        # 2. 计算哈希
         # 2. Calculate hashes
         for i, file_path in enumerate(image_files):
             if not self.is_running:
                 return
             
             try:
-                # 使用 dhash (Difference Hash) 算法，速度快且对缩放/亮度变化鲁棒
-                # Use dhash (Difference Hash) algorithm, fast and robust to scaling/brightness changes
+                # Use crop_resistant_hash for partial image matching
                 with Image.open(file_path) as img:
-                    h = imagehash.dhash(img)
+                    h = imagehash.crop_resistant_hash(img)
                     index_data[file_path] = str(h)
             except Exception as e:
                 print(f"Error indexing {file_path}: {e}")
             
-            self.progress_update.emit(i + 1, total_files, file_path)
+            # Throttle updates to avoid UI freeze
+            if i % 10 == 0 or i == total_files - 1:
+                self.progress_update.emit(i + 1, total_files, file_path)
             
         self.finished.emit(index_data)
 
@@ -94,9 +96,10 @@ class ImageFinderApp(QMainWindow):
         super().__init__()
         self.setWindowTitle("macOS Image Finder")
         self.resize(800, 600)
-        self.setAcceptDrops(True) # 允许拖拽文件 / Allow file dropping
+        self.setAcceptDrops(True) 
         
         self.image_index = {}
+        self.image_hashes = {} # Cache for ImageHash objects
         self.directories = []
         self.indexer_thread = None
         
@@ -110,7 +113,6 @@ class ImageFinderApp(QMainWindow):
         layout.setSpacing(10)
         layout.setContentsMargins(20, 20, 20, 20)
 
-        # --- Top: Indexing Area (索引管理区域) ---
         index_group = QFrame()
         index_group.setFrameShape(QFrame.Shape.StyledPanel)
         index_layout = QVBoxLayout(index_group)
@@ -138,7 +140,6 @@ class ImageFinderApp(QMainWindow):
         
         layout.addWidget(index_group)
 
-        # --- Center: Drop Zone (拖拽区域) ---
         self.drop_zone = DropLabel("Drag & Drop Image Here\nor Paste (Cmd+V)")
         self.drop_zone.dropped.connect(lambda path: self.search_image(file_path=path))
         self.drop_zone.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -158,7 +159,6 @@ class ImageFinderApp(QMainWindow):
         self.drop_zone.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout.addWidget(self.drop_zone)
 
-        # --- Bottom: Result Area (结果展示区域) ---
         result_group = QFrame()
         result_group.setFrameShape(QFrame.Shape.StyledPanel)
         result_layout = QHBoxLayout(result_group)
@@ -195,7 +195,7 @@ class ImageFinderApp(QMainWindow):
 
     def start_indexing(self):
         if not self.directories:
-            QMessageBox.warning(self, "Warning", "Please add at least one directory.")
+            QMessageBox.warning(self, "Warning", "Please add, self.image_index at least one directory.")
             return
             
         self.btn_index.setEnabled(False)
@@ -213,6 +213,13 @@ class ImageFinderApp(QMainWindow):
         self.lbl_status.setText(f"Indexing: {os.path.basename(current_file)}")
 
     def indexing_finished(self, index_data):
+        # Update hash cache
+        for path, hash_str in index_data.items():
+            try:
+                self.image_hashes[path] = imagehash.hex_to_multihash(hash_str)
+            except:
+                pass
+                
         self.image_index.update(index_data)
         self.save_index()
         self.btn_index.setEnabled(True)
@@ -232,6 +239,15 @@ class ImageFinderApp(QMainWindow):
             try:
                 with open(INDEX_FILE, 'r') as f:
                     self.image_index = json.load(f)
+                
+                # Pre-calculate hashes for faster search
+                self.image_hashes = {}
+                for path, hash_str in self.image_index.items():
+                    try:
+                        self.image_hashes[path] = imagehash.hex_to_multihash(hash_str)
+                    except:
+                        continue
+                        
                 self.lbl_status.setText(f"Loaded index with {len(self.image_index)} images.")
             except Exception as e:
                 print(f"Failed to load index: {e}")
@@ -276,7 +292,7 @@ class ImageFinderApp(QMainWindow):
             if file_path:
                 self.lbl_status.setText(f"Searching for: {os.path.basename(file_path)}...")
                 with Image.open(file_path) as img:
-                    target_hash = imagehash.dhash(img)
+                    target_hash = imagehash.crop_resistant_hash(img)
             elif image_data:
                 self.lbl_status.setText("Searching for pasted image...")
                 # Convert QImage to PIL Image
@@ -284,7 +300,7 @@ class ImageFinderApp(QMainWindow):
                 buffer.open(QIODevice.OpenModeFlag.ReadWrite)
                 image_data.save(buffer, "PNG")
                 pil_im = Image.open(io.BytesIO(buffer.data()))
-                target_hash = imagehash.dhash(pil_im)
+                target_hash = imagehash.crop_resistant_hash(pil_im)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to process input image: {e}")
             return
@@ -294,22 +310,30 @@ class ImageFinderApp(QMainWindow):
 
         # Find best match
         best_match_path = None
+        max_matches = 0
         min_dist = float('inf')
 
-        # 遍历索引寻找汉明距离最小的图片
-        # Iterate through index to find image with minimum Hamming distance
-        for path, hash_str in self.image_index.items():
+        # Iterate through pre-calculated hashes
+        for path, h in self.image_hashes.items():
             try:
-                h = imagehash.hex_to_hash(hash_str)
-                dist = target_hash - h
-                if dist < min_dist:
+                # hash_diff returns (matches, distance)
+                # matches: number of segments in query that matched segments in db image
+                matches, dist = h.hash_diff(target_hash)
+                
+                # We prioritize number of matches, then lower distance
+                if matches > max_matches:
+                    max_matches = matches
                     min_dist = dist
                     best_match_path = path
+                elif matches == max_matches and matches > 0:
+                    if dist < min_dist:
+                        min_dist = dist
+                        best_match_path = path
             except:
                 continue
 
-        if best_match_path and min_dist <= HASH_THRESHOLD:
-            self.show_result(best_match_path, min_dist)
+        if best_match_path and max_matches > 0:
+            self.show_result(best_match_path, f"Matches: {max_matches}, Dist: {min_dist}")
         else:
             self.show_no_result()
 
@@ -318,10 +342,14 @@ class ImageFinderApp(QMainWindow):
         self.lbl_result_text.setText(f"Found: {os.path.basename(path)}\nPath: {path}\nDistance: {dist}")
         self.btn_reveal.setEnabled(True)
         
-        # Show thumbnail
-        pixmap = QPixmap(path)
-        if not pixmap.isNull():
-            self.lbl_result_thumb.setPixmap(pixmap.scaled(100, 100, Qt.AspectRatioMode.KeepAspectRatio))
+        # Show thumbnail efficiently using QImageReader
+        reader = QImageReader(path)
+        # Scale to slightly larger than target size to maintain quality, then let QLabel handle final scaling or scale here
+        reader.setScaledSize(QSize(100, 100)) 
+        img = reader.read()
+        
+        if not img.isNull():
+            self.lbl_result_thumb.setPixmap(QPixmap.fromImage(img))
         else:
             self.lbl_result_thumb.setText("No Preview")
             
@@ -340,7 +368,6 @@ class ImageFinderApp(QMainWindow):
 
     def reveal_in_finder(self, path):
         """
-        在 Finder 中显示文件
         Reveal file in Finder
         """
         if sys.platform == 'darwin':
