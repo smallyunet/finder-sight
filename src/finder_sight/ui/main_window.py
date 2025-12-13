@@ -15,7 +15,7 @@ import imagehash
 from src.finder_sight.constants import INDEX_FILE, CONFIG_FILE
 from src.finder_sight.core.indexer import IndexerThread
 from src.finder_sight.core.searcher import SearchThread
-from src.finder_sight.ui.widgets import DropLabel
+from src.finder_sight.ui.widgets import DropLabel, ClickableLabel
 
 class ImageFinderApp(QMainWindow):
     def __init__(self):
@@ -48,9 +48,17 @@ class ImageFinderApp(QMainWindow):
         top_btn_layout = QHBoxLayout()
         self.btn_add_dir = QPushButton("Add Directory")
         self.btn_add_dir.clicked.connect(self.add_directory)
+        self.btn_add_dir.setShortcut("Ctrl+O")
+        
+        self.btn_remove_dir = QPushButton("Remove Directory")
+        self.btn_remove_dir.clicked.connect(self.remove_directory)
+        self.btn_remove_dir.setShortcut("Backspace")
+
         self.btn_index = QPushButton("Start Indexing")
         self.btn_index.clicked.connect(self.start_indexing)
+        
         top_btn_layout.addWidget(self.btn_add_dir)
+        top_btn_layout.addWidget(self.btn_remove_dir)
         top_btn_layout.addWidget(self.btn_index)
         top_btn_layout.addStretch()
         
@@ -71,19 +79,6 @@ class ImageFinderApp(QMainWindow):
         self.drop_zone = DropLabel("Drag & Drop Image Here\nor Paste (Cmd+V)")
         self.drop_zone.dropped.connect(lambda path: self.search_image(file_path=path))
         self.drop_zone.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.drop_zone.setStyleSheet("""
-            QLabel {
-                border: 2px dashed #aaa;
-                border-radius: 10px;
-                font-size: 24px;
-                color: #555;
-                background-color: #f9f9f9;
-            }
-            QLabel:hover {
-                background-color: #f0f0f0;
-                border-color: #888;
-            }
-        """)
         self.drop_zone.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout.addWidget(self.drop_zone)
 
@@ -91,7 +86,8 @@ class ImageFinderApp(QMainWindow):
         result_group.setFrameShape(QFrame.Shape.StyledPanel)
         result_layout = QHBoxLayout(result_group)
         
-        self.lbl_result_thumb = QLabel()
+        self.lbl_result_thumb = ClickableLabel()
+        self.lbl_result_thumb.clicked.connect(self.reveal_current_result)
         self.lbl_result_thumb.setFixedSize(100, 100)
         self.lbl_result_thumb.setStyleSheet("border: 1px solid #ccc; background: #eee;")
         self.lbl_result_thumb.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -122,6 +118,15 @@ class ImageFinderApp(QMainWindow):
                 self.directories.append(dir_path)
                 self.dir_list.addItem(dir_path)
                 self.save_config()
+
+    def remove_directory(self):
+        selected_items = self.dir_list.selectedItems()
+        if not selected_items:
+            return
+        for item in selected_items:
+            self.directories.remove(item.text())
+            self.dir_list.takeItem(self.dir_list.row(item))
+        self.save_config()
 
     def start_indexing(self):
         if not self.directories:
@@ -262,8 +267,7 @@ class ImageFinderApp(QMainWindow):
             return
 
         self.lbl_status.setText("Searching...")
-        self.drop_zone.setText("Searching...")
-        self.drop_zone.setStyleSheet("QLabel { background-color: #e6f3ff; border: 2px solid #2196F3; }")
+        self.drop_zone.set_searching(True)
         
         # Start background search
         self.search_thread = SearchThread(self.image_hashes, target_hash)
@@ -272,20 +276,7 @@ class ImageFinderApp(QMainWindow):
         self.search_thread.start()
 
     def on_search_finished(self, path, matches, dist):
-        self.drop_zone.setText("Drag & Drop Image Here\nor Paste (Cmd+V)")
-        self.drop_zone.setStyleSheet("""
-            QLabel {
-                border: 2px dashed #aaa;
-                border-radius: 10px;
-                font-size: 24px;
-                color: #555;
-                background-color: #f9f9f9;
-            }
-            QLabel:hover {
-                background-color: #f0f0f0;
-                border-color: #888;
-            }
-        """)
+        self.drop_zone.set_searching(False)
 
         if path:
             self.show_result(path, f"Matches: {matches}, Dist: {dist}")
