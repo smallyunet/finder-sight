@@ -8,12 +8,13 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QListWidget, QProgressBar, QMessageBox, QStyle,
                              QFrame, QSizePolicy, QListWidgetItem)
 from PyQt6.QtCore import Qt, QBuffer, QIODevice, QSize
-from PyQt6.QtGui import QPixmap, QDragEnterEvent, QDropEvent, QImageReader, QKeySequence, QIcon
+from PyQt6.QtGui import (QPixmap, QDragEnterEvent, QDropEvent, QImageReader, 
+                         QKeySequence, QIcon, QAction)
 from PIL import Image
 import imagehash
 
 from src.finder_sight.constants import INDEX_FILE, CONFIG_FILE, THUMBNAIL_SIZE
-from src.finder_sight.core.indexer import IndexerThread
+from src.finder_sight.core.indexer import IndexerThread, IndexLoaderThread
 from src.finder_sight.core.searcher import SearchThread
 from src.finder_sight.ui.widgets import DropLabel, ClickableLabel
 from src.finder_sight.utils.logger import logger
@@ -30,8 +31,11 @@ class ImageFinderApp(QMainWindow):
         self.directories = []
         self.indexer_thread = None
         self.search_thread = None
+        self.index_loader_thread = None
+        self.indexing_cancelled = False
         
         self.init_ui()
+        self.create_menu_bar()
         self.load_config()
         self.load_index()
 
@@ -58,9 +62,14 @@ class ImageFinderApp(QMainWindow):
         self.btn_index = QPushButton("Start Indexing")
         self.btn_index.clicked.connect(self.start_indexing)
         
+        self.btn_cancel = QPushButton("Cancel")
+        self.btn_cancel.clicked.connect(self.cancel_indexing)
+        self.btn_cancel.setEnabled(False)
+        
         top_btn_layout.addWidget(self.btn_add_dir)
         top_btn_layout.addWidget(self.btn_remove_dir)
         top_btn_layout.addWidget(self.btn_index)
+        top_btn_layout.addWidget(self.btn_cancel)
         top_btn_layout.addStretch()
         
         self.dir_list = QListWidget()
@@ -120,6 +129,8 @@ class ImageFinderApp(QMainWindow):
             return
             
         self.btn_index.setEnabled(False)
+        self.btn_cancel.setEnabled(True)
+        self.indexing_cancelled = False
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
         
@@ -128,6 +139,13 @@ class ImageFinderApp(QMainWindow):
         self.indexer_thread.finished.connect(self.indexing_finished)
         self.indexer_thread.deleted_files.connect(self.on_deleted_files_found)
         self.indexer_thread.start()
+
+    def cancel_indexing(self):
+        if self.indexer_thread and self.indexer_thread.isRunning():
+            self.indexing_cancelled = True
+            self.indexer_thread.stop()
+            self.lbl_status.setText("Stopping indexer...")
+            self.btn_cancel.setEnabled(False)
 
     def on_deleted_files_found(self, deleted_paths: list[str]) -> None:
         """Handle notification of deleted files from indexer."""
@@ -158,11 +176,18 @@ class ImageFinderApp(QMainWindow):
                 
         self.image_index.update(index_data)
         self.save_index()
+        self.save_index()
         self.btn_index.setEnabled(True)
+        self.btn_cancel.setEnabled(False)
         self.progress_bar.setVisible(False)
         self.lbl_status.setText(f"Indexing complete. Total images: {len(self.image_index)}")
-        QMessageBox.information(self, "Done", f"Indexed {len(index_data)} new images.")
-        logger.info(f"Indexing finished: {len(index_data)} new images indexed")
+        
+        if self.indexing_cancelled:
+            self.lbl_status.setText("Indexing cancelled.")
+            logger.info("Indexing cancelled by user")
+        else:
+            QMessageBox.information(self, "Done", f"Indexed {len(index_data)} new images.")
+            logger.info(f"Indexing finished: {len(index_data)} new images indexed")
 
     def save_index(self):
         try:
@@ -174,30 +199,73 @@ class ImageFinderApp(QMainWindow):
             logger.error(f"Failed to save index: {e}")
 
     def load_index(self):
-        if os.path.exists(INDEX_FILE):
-            try:
-                with open(INDEX_FILE, 'r') as f:
-                    self.image_index = json.load(f)
-                
-                # Pre-calculate hashes for faster search
-                self.image_hashes = {}
-                hash_load_failures = 0
-                for path, hash_str in self.image_index.items():
-                    try:
-                        self.image_hashes[path] = imagehash.hex_to_multihash(hash_str)
-                    except Exception as e:
-                        hash_load_failures += 1
-                        logger.debug(f"Failed to parse hash for {path}: {e}")
-                        continue
-                
-                if hash_load_failures > 0:
-                    logger.warning(f"{hash_load_failures} hashes failed to load from index")
-                        
-                self.lbl_status.setText(f"Loaded index with {len(self.image_index)} images.")
-                logger.info(f"Loaded index with {len(self.image_index)} images")
-            except Exception as e:
-                QMessageBox.warning(self, "Warning", f"Failed to load index: {e}\nStarting with empty index.")
-                logger.error(f"Failed to load index: {e}")
+        self.lbl_status.setText("Loading index...")
+        self.btn_index.setEnabled(False)
+        self.btn_add_dir.setEnabled(False)
+        self.btn_remove_dir.setEnabled(False)
+        
+        self.index_loader_thread = IndexLoaderThread(INDEX_FILE)
+        self.index_loader_thread.finished.connect(self.on_index_loaded)
+        self.index_loader_thread.error.connect(self.on_index_load_error)
+        self.index_loader_thread.start()
+
+    def on_index_loaded(self, index_data, hash_data):
+        self.image_index = index_data
+        self.image_hashes = hash_data
+        
+        self.lbl_status.setText(f"Loaded index with {len(self.image_index)} images.")
+        logger.info(f"Loaded index with {len(self.image_index)} images")
+        
+        self.btn_index.setEnabled(True)
+        self.btn_add_dir.setEnabled(True)
+        self.btn_remove_dir.setEnabled(True)
+        self.index_loader_thread = None
+
+    def on_index_load_error(self, error_msg):
+        self.lbl_status.setText("Error loading index.")
+        QMessageBox.warning(self, "Warning", f"Failed to load index: {error_msg}")
+        logger.error(f"Failed to load index: {error_msg}")
+        
+        self.btn_index.setEnabled(True)
+        self.btn_add_dir.setEnabled(True)
+        self.btn_remove_dir.setEnabled(True)
+        self.index_loader_thread = None
+
+    def create_menu_bar(self):
+        menu_bar = self.menuBar()
+        
+        # File Menu
+        file_menu = menu_bar.addMenu("&File")
+        
+        add_dir_action = QAction("&Add Directory", self)
+        add_dir_action.setShortcut("Ctrl+O")
+        add_dir_action.triggered.connect(self.add_directory)
+        file_menu.addAction(add_dir_action)
+        
+        start_index_action = QAction("Start &Indexing", self)
+        start_index_action.setShortcut("Ctrl+I")
+        start_index_action.triggered.connect(self.start_indexing)
+        file_menu.addAction(start_index_action)
+        
+        file_menu.addSeparator()
+        
+        exit_action = QAction("E&xit", self)
+        exit_action.setShortcut("Ctrl+Q")
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+        
+        # Help Menu
+        help_menu = menu_bar.addMenu("&Help")
+        
+        about_action = QAction("&About", self)
+        about_action.triggered.connect(self.show_about)
+        help_menu.addAction(about_action)
+
+    def show_about(self):
+        QMessageBox.about(self, "About Finder Sight", 
+                          "Finder Sight v0.0.2\n\n"
+                          "Local Reverse Image Search for macOS.\n"
+                          "Created by smallyu.")
 
     def save_config(self):
         try:
