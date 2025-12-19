@@ -97,6 +97,7 @@ class IndexerThread(QThread):
                 for file_path in image_files:
                     if not self.is_running:
                         executor.shutdown(wait=False, cancel_futures=True)
+                        logger.info("Indexing stopped before starting all tasks")
                         return
                     future = executor.submit(calculate_hash, file_path)
                     futures.append(future)
@@ -104,6 +105,7 @@ class IndexerThread(QThread):
                 for i, future in enumerate(futures):
                     if not self.is_running:
                         executor.shutdown(wait=False, cancel_futures=True)
+                        logger.info(f"Indexing stopped at task {i+1}/{total_files}")
                         return
                     
                     try:
@@ -124,6 +126,8 @@ class IndexerThread(QThread):
                 f"Indexing complete: {len(index_data)} succeeded, {failed_count} failed"
             )
             
+        except Exception as e:
+            logger.error(f"Indexer error: {e}")
         finally:
             self.finished.emit(index_data)
 

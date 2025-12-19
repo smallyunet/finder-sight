@@ -6,7 +6,7 @@ import io
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QFileDialog, 
                              QListWidget, QProgressBar, QMessageBox, QStyle,
-                             QFrame, QSizePolicy, QListWidgetItem)
+                             QFrame, QSizePolicy, QListWidgetItem, QMenu)
 from PyQt6.QtCore import Qt, QBuffer, QIODevice, QSize
 from PyQt6.QtGui import (QPixmap, QDragEnterEvent, QDropEvent, QImageReader, 
                          QKeySequence, QIcon, QAction)
@@ -66,10 +66,14 @@ class ImageFinderApp(QMainWindow):
         self.btn_cancel.clicked.connect(self.cancel_indexing)
         self.btn_cancel.setEnabled(False)
         
+        self.btn_clear_index = QPushButton("Clear Index")
+        self.btn_clear_index.clicked.connect(self.clear_index)
+        
         top_btn_layout.addWidget(self.btn_add_dir)
         top_btn_layout.addWidget(self.btn_remove_dir)
         top_btn_layout.addWidget(self.btn_index)
         top_btn_layout.addWidget(self.btn_cancel)
+        top_btn_layout.addWidget(self.btn_clear_index)
         top_btn_layout.addStretch()
         
         self.dir_list = QListWidget()
@@ -90,6 +94,7 @@ class ImageFinderApp(QMainWindow):
         self.drop_zone.dropped.connect(lambda path: self.search_image(file_path=path))
         self.drop_zone.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.drop_zone.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.drop_zone.setToolTip("You can also copy an image to clipboard and paste it here.")
         layout.addWidget(self.drop_zone)
 
         result_group = QFrame()
@@ -101,6 +106,8 @@ class ImageFinderApp(QMainWindow):
         self.result_list = QListWidget()
         self.result_list.setIconSize(QSize(THUMBNAIL_SIZE, THUMBNAIL_SIZE))
         self.result_list.itemDoubleClicked.connect(self.on_result_double_clicked)
+        self.result_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.result_list.customContextMenuRequested.connect(self.show_context_menu)
         
         result_layout.addWidget(self.result_list)
         
@@ -130,6 +137,7 @@ class ImageFinderApp(QMainWindow):
             
         self.btn_index.setEnabled(False)
         self.btn_cancel.setEnabled(True)
+        self.btn_clear_index.setEnabled(False)
         self.indexing_cancelled = False
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
@@ -179,6 +187,7 @@ class ImageFinderApp(QMainWindow):
         self.save_index()
         self.btn_index.setEnabled(True)
         self.btn_cancel.setEnabled(False)
+        self.btn_clear_index.setEnabled(True)
         self.progress_bar.setVisible(False)
         self.lbl_status.setText(f"Indexing complete. Total images: {len(self.image_index)}")
         
@@ -263,7 +272,7 @@ class ImageFinderApp(QMainWindow):
 
     def show_about(self):
         QMessageBox.about(self, "About Finder Sight", 
-                          "Finder Sight v0.0.2\n\n"
+                          "Finder Sight v0.0.3\n\n"
                           "Local Reverse Image Search for macOS.\n"
                           "Created by smallyu.")
 
@@ -387,6 +396,66 @@ class ImageFinderApp(QMainWindow):
         path = item.data(Qt.ItemDataRole.UserRole)
         if path:
             self.reveal_in_finder(path)
+
+    def show_context_menu(self, position):
+        item = self.result_list.itemAt(position)
+        if not item:
+            return
+            
+        path = item.data(Qt.ItemDataRole.UserRole)
+        menu = QMenu()
+        
+        reveal_action = QAction("Reveal in Finder", self)
+        reveal_action.triggered.connect(lambda: self.reveal_in_finder(path))
+        menu.addAction(reveal_action)
+        
+        open_action = QAction("Open", self)
+        open_action.triggered.connect(lambda: self.open_file(path))
+        menu.addAction(open_action)
+        
+        copy_path_action = QAction("Copy Path", self)
+        copy_path_action.triggered.connect(lambda: self.copy_to_clipboard(path))
+        menu.addAction(copy_path_action)
+        
+        copy_image_action = QAction("Copy Image", self)
+        copy_image_action.triggered.connect(lambda: self.copy_image_to_clipboard(path))
+        menu.addAction(copy_image_action)
+        
+        menu.exec(self.result_list.viewport().mapToGlobal(position))
+
+    def open_file(self, path):
+        if sys.platform == 'darwin':
+            subprocess.run(['open', path])
+        elif os.name == 'nt':
+            os.startfile(path)
+        else:
+            subprocess.run(['xdg-open', path])
+
+    def copy_to_clipboard(self, text):
+        QApplication.clipboard().setText(text)
+        self.lbl_status.setText(f"Copied to clipboard: {os.path.basename(text)}")
+
+    def copy_image_to_clipboard(self, path):
+        pixmap = QPixmap(path)
+        if not pixmap.isNull():
+            QApplication.clipboard().setPixmap(pixmap)
+            self.lbl_status.setText(f"Copied image to clipboard: {os.path.basename(path)}")
+        else:
+            QMessageBox.warning(self, "Error", "Failed to load image for copying.")
+
+    def clear_index(self):
+        reply = QMessageBox.question(self, "Clear Index", 
+                                   "Are you sure you want to clear the local index? "
+                                   "This will not delete your image files.",
+                                   QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            self.image_index = {}
+            self.image_hashes = {}
+            self.save_index()
+            self.lbl_status.setText("Index cleared.")
+            self.result_list.clear()
+            logger.info("Index cleared by user")
 
     def reveal_in_finder(self, path):
         """
