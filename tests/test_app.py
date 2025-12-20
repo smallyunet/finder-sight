@@ -214,8 +214,15 @@ def test_supported_extensions():
     assert '.png' in SUPPORTED_EXTENSIONS
     assert '.webp' in SUPPORTED_EXTENSIONS
     assert '.bmp' in SUPPORTED_EXTENSIONS
+    # v0.0.4 additions
+    assert '.gif' in SUPPORTED_EXTENSIONS
+    assert '.heic' in SUPPORTED_EXTENSIONS
+    assert '.heif' in SUPPORTED_EXTENSIONS
+    assert '.tiff' in SUPPORTED_EXTENSIONS
+    assert '.tif' in SUPPORTED_EXTENSIONS
+    # Unsupported
     assert '.txt' not in SUPPORTED_EXTENSIONS
-    assert '.gif' not in SUPPORTED_EXTENSIONS
+    assert '.mp4' not in SUPPORTED_EXTENSIONS
 
 
 def test_constants():
