@@ -50,12 +50,17 @@ class MockSlowIndexerThread(IndexerThread):
         self.is_running = True
         # Simulate long running task
         for i in range(50):
-            if not self.is_running:
+            if self.isInterruptionRequested():
+                self.finished.emit({})
                 return
             time.sleep(0.05)
             self.progress_update.emit(i+1, 50, f"file_{i}.jpg")
         
         self.finished.emit({})
+    
+    def stop(self) -> None:
+        self.is_running = False
+        self.requestInterruption()
 
 def test_cancel_indexing(qtbot, monkeypatch):
     """Test that the cancel button stops the indexer."""
