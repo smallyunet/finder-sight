@@ -43,6 +43,7 @@ def test_clear_index(qtbot, monkeypatch):
 def test_ui_state_after_cancel(qtbot, monkeypatch):
     """Test that UI buttons are correctly enabled/disabled after cancel."""
     from src.finder_sight.ui import main_window
+    from PyQt6.QtWidgets import QApplication
     
     # Mock IndexerThread to stay running until we stop it
     class SlowIndexer(IndexerThread):
@@ -68,13 +69,18 @@ def test_ui_state_after_cancel(qtbot, monkeypatch):
     
     # 2. Start indexing
     qtbot.mouseClick(app.btn_index, Qt.MouseButton.LeftButton)
+    # Wait for thread to actually start
+    qtbot.waitUntil(lambda: app.indexer_thread is not None and app.indexer_thread.isRunning(), timeout=1000)
     assert not app.btn_index.isEnabled()
     assert app.btn_cancel.isEnabled()
     assert not app.btn_clear_index.isEnabled()
     
-    # 3. Cancel indexing
-    with qtbot.waitSignal(app.indexer_thread.finished, timeout=2000):
-        qtbot.mouseClick(app.btn_cancel, Qt.MouseButton.LeftButton)
+    # 3. Cancel indexing - click and wait for thread to finish
+    qtbot.mouseClick(app.btn_cancel, Qt.MouseButton.LeftButton)
+    # Wait for the thread to stop running
+    qtbot.waitUntil(lambda: not app.indexer_thread.isRunning(), timeout=2000)
+    # Process pending events to ensure finished signal is handled
+    QApplication.processEvents()
         
     # 4. After cancel
     assert app.btn_index.isEnabled()
