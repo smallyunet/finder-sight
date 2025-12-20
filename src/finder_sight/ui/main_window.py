@@ -13,10 +13,14 @@ from PyQt6.QtGui import (QPixmap, QDragEnterEvent, QDropEvent, QImageReader,
 from PIL import Image
 import imagehash
 
-from src.finder_sight.constants import INDEX_FILE, CONFIG_FILE, THUMBNAIL_SIZE
+from src.finder_sight.constants import (
+    INDEX_FILE, CONFIG_FILE, THUMBNAIL_SIZE,
+    DEFAULT_MAX_RESULTS, DEFAULT_SIMILARITY_THRESHOLD
+)
 from src.finder_sight.core.indexer import IndexerThread, IndexLoaderThread
 from src.finder_sight.core.searcher import SearchThread
 from src.finder_sight.ui.widgets import DropLabel, ClickableLabel
+from src.finder_sight.ui.settings_dialog import SettingsDialog
 from src.finder_sight.utils.logger import logger
 
 class ImageFinderApp(QMainWindow):
@@ -33,6 +37,10 @@ class ImageFinderApp(QMainWindow):
         self.search_thread = None
         self.index_loader_thread = None
         self.indexing_cancelled = False
+        
+        # Settings
+        self.similarity_threshold = DEFAULT_SIMILARITY_THRESHOLD
+        self.max_results = DEFAULT_MAX_RESULTS
         
         self.init_ui()
         self.create_menu_bar()
@@ -263,6 +271,14 @@ class ImageFinderApp(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
         
+        # Edit Menu
+        edit_menu = menu_bar.addMenu("&Edit")
+        
+        settings_action = QAction("&Settings...", self)
+        settings_action.setShortcut("Ctrl+,")
+        settings_action.triggered.connect(self.show_settings)
+        edit_menu.addAction(settings_action)
+        
         # Help Menu
         help_menu = menu_bar.addMenu("&Help")
         
@@ -272,14 +288,18 @@ class ImageFinderApp(QMainWindow):
 
     def show_about(self):
         QMessageBox.about(self, "About Finder Sight", 
-                          "Finder Sight v0.0.3\n\n"
+                          "Finder Sight v0.0.4\n\n"
                           "Local Reverse Image Search for macOS.\n"
                           "Created by smallyu.")
 
     def save_config(self):
         try:
             with open(CONFIG_FILE, 'w') as f:
-                json.dump({"directories": self.directories}, f)
+                json.dump({
+                    "directories": self.directories,
+                    "similarity_threshold": self.similarity_threshold,
+                    "max_results": self.max_results
+                }, f)
             logger.debug("Config saved")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save config: {e}")
@@ -291,12 +311,30 @@ class ImageFinderApp(QMainWindow):
                 with open(CONFIG_FILE, 'r') as f:
                     data = json.load(f)
                     self.directories = data.get("directories", [])
+                    self.similarity_threshold = data.get(
+                        "similarity_threshold", DEFAULT_SIMILARITY_THRESHOLD
+                    )
+                    self.max_results = data.get("max_results", DEFAULT_MAX_RESULTS)
                     for d in self.directories:
                         self.dir_list.addItem(d)
                 logger.debug(f"Config loaded with {len(self.directories)} directories")
             except Exception as e:
                 QMessageBox.warning(self, "Warning", f"Failed to load config: {e}")
                 logger.error(f"Failed to load config: {e}")
+
+    def show_settings(self):
+        """Open the settings dialog."""
+        current_settings = {
+            'similarity_threshold': self.similarity_threshold,
+            'max_results': self.max_results
+        }
+        dialog = SettingsDialog(self, current_settings)
+        if dialog.exec():
+            settings = dialog.get_settings()
+            self.similarity_threshold = settings['similarity_threshold']
+            self.max_results = settings['max_results']
+            self.save_config()
+            logger.info(f"Settings updated: threshold={self.similarity_threshold}, max_results={self.max_results}")
 
     # --- Drag & Drop Implementation ---
     def dragEnterEvent(self, event: QDragEnterEvent):
@@ -362,21 +400,31 @@ class ImageFinderApp(QMainWindow):
         self.lbl_status.setText("Searching...")
         self.drop_zone.set_searching(True)
         
-        # Start background search
-        self.search_thread = SearchThread(self.image_hashes, target_hash)
+        # Start background search with current settings
+        self.search_thread = SearchThread(
+            self.image_hashes, 
+            target_hash,
+            max_results=self.max_results,
+            similarity_threshold=self.similarity_threshold
+        )
         self.search_thread.finished.connect(self.on_search_finished)
+        self.search_thread.progress.connect(self.on_search_progress)
         self.search_thread.error.connect(lambda e: QMessageBox.critical(self, "Error", e))
         self.search_thread.start()
+
+    def on_search_progress(self, current, total):
+        """Update status with search progress."""
+        self.lbl_status.setText(f"Searching... ({current}/{total})")
 
     def on_search_finished(self, results):
         self.drop_zone.set_searching(False)
         self.result_list.clear()
 
         if not results:
-            self.lbl_status.setText("Search finished. No match.")
+            self.lbl_status.setText(f"Search finished. No match. (Index: {len(self.image_index)} images)")
             return
 
-        self.lbl_status.setText(f"Found {len(results)} matches.")
+        self.lbl_status.setText(f"Found {len(results)} matches. (Index: {len(self.image_index)} images)")
         
         for path, matches, dist in results:
             item = QListWidgetItem()
