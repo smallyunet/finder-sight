@@ -49,9 +49,13 @@ def test_ui_state_after_cancel(qtbot, monkeypatch):
     class SlowIndexer(IndexerThread):
         def run(self):
             self.is_running = True
-            while self.is_running:
+            while not self.isInterruptionRequested():
                 self.msleep(10)
             self.finished.emit({})
+        
+        def stop(self):
+            self.is_running = False
+            self.requestInterruption()
 
     monkeypatch.setattr(main_window, 'IndexerThread', SlowIndexer)
     monkeypatch.setattr(ImageFinderApp, 'load_index', lambda self: None)
