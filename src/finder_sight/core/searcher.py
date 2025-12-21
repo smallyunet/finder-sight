@@ -10,7 +10,7 @@ class SearchThread(QThread):
     """
     Background thread for searching to prevent UI freeze.
     """
-    finished = pyqtSignal(list)  # list of (path, matches, distance)
+    finished = pyqtSignal(list)  # list of (path, distance)
     progress = pyqtSignal(int, int)  # current, total
     error = pyqtSignal(str)
 
@@ -38,11 +38,11 @@ class SearchThread(QThread):
                     return
 
                 try:
-                    # hash_diff returns (matches, distance) for crop_resistant_hash
-                    matches, dist = h.hash_diff(self.target_hash)
-                    # Filter by similarity threshold (minimum matches required)
-                    if matches > self.similarity_threshold:
-                        results.append((path, matches, dist))
+                    # For phash, we use Hamming distance (lower is more similar)
+                    dist = h - self.target_hash
+                    # Filter by similarity threshold (maximum distance allowed)
+                    if dist <= self.similarity_threshold:
+                        results.append((path, dist))
                 except Exception as e:
                     logger.debug(f"Failed to compare hash for {path}: {e}")
                     continue
@@ -51,8 +51,8 @@ class SearchThread(QThread):
                 if (i + 1) % 100 == 0 or i == total - 1:
                     self.progress.emit(i + 1, total)
 
-            # Sort by matches (desc) then distance (asc)
-            results.sort(key=lambda x: (-x[1], x[2]))
+            # Sort by distance (asc)
+            results.sort(key=lambda x: x[1])
 
             # Return top N results
             self.finished.emit(results[:self.max_results])

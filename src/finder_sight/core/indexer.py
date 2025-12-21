@@ -26,8 +26,8 @@ def calculate_hash(file_path: str) -> tuple[str, Optional[str]]:
             # Convert to RGB to handle various image modes
             if img.mode != 'RGB':
                 img = img.convert('RGB')
-            # crop_resistant_hash is designed for partial/cropped image matching
-            h = imagehash.crop_resistant_hash(img)
+            # phash is better for general similarity and exact matching
+            h = imagehash.phash(img)
             return file_path, str(h)
     except Exception as e:
         # Logging happens in main process, just return None
@@ -165,7 +165,7 @@ class IndexLoaderThread(QThread):
             hash_data = {}
             for path, hash_str in index_data.items():
                 try:
-                    hash_data[path] = imagehash.hex_to_multihash(hash_str)
+                    hash_data[path] = imagehash.hex_to_hash(hash_str)
                 except Exception:
                     # Ignore invalid hashes
                     pass

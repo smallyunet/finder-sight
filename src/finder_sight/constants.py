@@ -11,7 +11,7 @@ SUPPORTED_EXTENSIONS = {
 
 # Search settings
 DEFAULT_MAX_RESULTS = 20
-DEFAULT_SIMILARITY_THRESHOLD = 0  # Minimum segment matches required (matches > threshold)
+DEFAULT_SIMILARITY_THRESHOLD = 10  # Max Hamming distance for phash (dist <= threshold)
 
 # UI settings
 THUMBNAIL_SIZE = 100

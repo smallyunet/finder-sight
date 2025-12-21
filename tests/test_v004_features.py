@@ -28,14 +28,14 @@ def test_new_supported_extensions():
 
 def test_similarity_threshold_constant():
     """Test that default similarity threshold is defined."""
-    assert DEFAULT_SIMILARITY_THRESHOLD == 0  # Show all matches with > 0 segments
+    assert DEFAULT_SIMILARITY_THRESHOLD == 10  # Max Hamming distance for phash
 
 
 def test_search_thread_with_threshold(qtbot):
     """Test SearchThread filters results by similarity threshold."""
     # Create a sample hash
     img = Image.new('RGB', (100, 100), color='red')
-    sample_hash = imagehash.crop_resistant_hash(img)
+    sample_hash = imagehash.phash(img)
     
     # Create image_hashes dict
     image_hashes = {
@@ -49,7 +49,7 @@ def test_search_thread_with_threshold(qtbot):
         image_hashes, 
         sample_hash, 
         max_results=10,
-        similarity_threshold=1000  # Very high, impossible to exceed
+        similarity_threshold=-1  # Impossible to have negative distance
     )
     
     results = []
@@ -61,14 +61,14 @@ def test_search_thread_with_threshold(qtbot):
     with qtbot.waitSignal(thread.finished, timeout=5000):
         thread.start()
     
-    # Very high threshold should filter all results
+    # Very low (negative) threshold should filter all results
     assert len(results) == 0
 
 
 def test_search_thread_progress_signal(qtbot):
     """Test that SearchThread emits progress signals."""
     img = Image.new('RGB', (100, 100), color='red')
-    sample_hash = imagehash.crop_resistant_hash(img)
+    sample_hash = imagehash.phash(img)
     
     # Create enough hashes to trigger progress
     image_hashes = {

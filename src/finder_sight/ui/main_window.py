@@ -182,7 +182,7 @@ class ImageFinderApp(QMainWindow):
         hash_load_failures = 0
         for path, hash_str in index_data.items():
             try:
-                self.image_hashes[path] = imagehash.hex_to_multihash(hash_str)
+                self.image_hashes[path] = imagehash.hex_to_hash(hash_str)
             except Exception as e:
                 hash_load_failures += 1
                 logger.debug(f"Failed to parse hash for {path}: {e}")
@@ -387,7 +387,7 @@ class ImageFinderApp(QMainWindow):
                     # Convert to RGB for consistency
                     if img.mode != 'RGB':
                         img = img.convert('RGB')
-                    target_hash = imagehash.crop_resistant_hash(img)
+                    target_hash = imagehash.phash(img)
             elif image_data:
                 self.lbl_status.setText("Processing pasted image...")
                 # Convert QImage to PIL Image
@@ -397,7 +397,7 @@ class ImageFinderApp(QMainWindow):
                 pil_im = Image.open(io.BytesIO(buffer.data()))
                 if pil_im.mode != 'RGB':
                     pil_im = pil_im.convert('RGB')
-                target_hash = imagehash.crop_resistant_hash(pil_im)
+                target_hash = imagehash.phash(pil_im)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to process input image: {e}")
             return
@@ -434,9 +434,9 @@ class ImageFinderApp(QMainWindow):
 
         self.lbl_status.setText(f"Found {len(results)} matches. (Index: {len(self.image_index)} images)")
         
-        for path, matches, dist in results:
+        for path, dist in results:
             item = QListWidgetItem()
-            item.setText(f"{os.path.basename(path)}\nMatches: {matches} (Distance: {dist:.2f})")
+            item.setText(f"{os.path.basename(path)}\nDistance: {dist:.2f}")
             item.setData(Qt.ItemDataRole.UserRole, path)
             
             # Load thumbnail
