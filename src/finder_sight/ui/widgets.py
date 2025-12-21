@@ -97,8 +97,8 @@ class DropLabel(QLabel):
 
     def set_searching(self, searching: bool):
         if searching:
+            self.clear() # Clear current display (text or pixmap)
             self.setText("Searching...")
-            self._preview_pixmap = None
             self.setStyleSheet("QLabel { background-color: #e6f3ff; border: 2px solid #2196F3; font-size: 24px; }")
         else:
             if self._preview_pixmap:
