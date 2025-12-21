@@ -49,7 +49,7 @@ def test_hashing():
     
     # Create a distinct image for img3
     img3 = Image.new('RGB', (100, 100), color='blue')
-    # Add some pattern to make dhash distinct from solid red
+    # Add some pattern to make hash distinct from solid red
     from PIL import ImageDraw
     d = ImageDraw.Draw(img3)
     d.rectangle([20, 20, 80, 80], fill="white")
@@ -59,13 +59,10 @@ def test_hashing():
     h2 = imagehash.crop_resistant_hash(img2)
     h3 = imagehash.crop_resistant_hash(img3)
     
-    # Note: crop_resistant_hash returns ImageMultiHash
     # For identical images, they should match
     assert h1.matches(h2)
     
-    # For different images, they should likely not match (or have low match count)
-    # But solid colors might be tricky for segmentation based hashing
-    # Let's just check they are not identical objects
+    # Check string representations
     assert str(h1) == str(h2)
     assert str(h1) != str(h3)
 
@@ -168,7 +165,8 @@ def test_search_thread_with_matches(qtbot, sample_image_hash):
         "/path/to/matching_image.jpg": sample_image_hash
     }
     
-    thread = SearchThread(image_hashes, sample_image_hash)
+    # Use threshold=0 to ensure any matches > 0 will be returned
+    thread = SearchThread(image_hashes, sample_image_hash, similarity_threshold=0)
     
     results = []
     def on_finished(data):

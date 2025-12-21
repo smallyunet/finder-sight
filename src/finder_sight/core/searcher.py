@@ -38,8 +38,9 @@ class SearchThread(QThread):
                     return
 
                 try:
+                    # hash_diff returns (matches, distance) for crop_resistant_hash
                     matches, dist = h.hash_diff(self.target_hash)
-                    # Filter by similarity threshold
+                    # Filter by similarity threshold (minimum matches required)
                     if matches > self.similarity_threshold:
                         results.append((path, matches, dist))
                 except Exception as e:

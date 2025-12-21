@@ -11,7 +11,7 @@ SUPPORTED_EXTENSIONS = {
 
 # Search settings
 DEFAULT_MAX_RESULTS = 20
-DEFAULT_SIMILARITY_THRESHOLD = 0  # Minimum match count (0 = show all matches)
+DEFAULT_SIMILARITY_THRESHOLD = 0  # Minimum segment matches required (matches > threshold)
 
 # UI settings
 THUMBNAIL_SIZE = 100

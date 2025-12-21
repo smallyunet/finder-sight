@@ -23,7 +23,10 @@ def calculate_hash(file_path: str) -> tuple[str, Optional[str]]:
     """
     try:
         with Image.open(file_path) as img:
-            # crop_resistant_hash is computationally expensive
+            # Convert to RGB to handle various image modes
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            # crop_resistant_hash is designed for partial/cropped image matching
             h = imagehash.crop_resistant_hash(img)
             return file_path, str(h)
     except Exception as e:

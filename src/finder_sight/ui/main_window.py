@@ -355,12 +355,15 @@ class ImageFinderApp(QMainWindow):
             
             if mime_data.hasImage():
                 qimage = clipboard.image()
+                # Show preview of pasted image
+                self.drop_zone.set_preview_image(pixmap=QPixmap.fromImage(qimage))
                 self.search_image(image_data=qimage)
             elif mime_data.hasUrls():
                  # Handle copied file
                 urls = mime_data.urls()
                 if urls:
                     file_path = urls[0].toLocalFile()
+                    self.drop_zone.set_preview_image(file_path=file_path)
                     self.search_image(file_path=file_path)
         else:
             super().keyPressEvent(event)
@@ -381,6 +384,9 @@ class ImageFinderApp(QMainWindow):
             if file_path:
                 self.lbl_status.setText(f"Processing: {os.path.basename(file_path)}...")
                 with Image.open(file_path) as img:
+                    # Convert to RGB for consistency
+                    if img.mode != 'RGB':
+                        img = img.convert('RGB')
                     target_hash = imagehash.crop_resistant_hash(img)
             elif image_data:
                 self.lbl_status.setText("Processing pasted image...")
@@ -389,6 +395,8 @@ class ImageFinderApp(QMainWindow):
                 buffer.open(QIODevice.OpenModeFlag.ReadWrite)
                 image_data.save(buffer, "PNG")
                 pil_im = Image.open(io.BytesIO(buffer.data()))
+                if pil_im.mode != 'RGB':
+                    pil_im = pil_im.convert('RGB')
                 target_hash = imagehash.crop_resistant_hash(pil_im)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to process input image: {e}")
@@ -428,7 +436,7 @@ class ImageFinderApp(QMainWindow):
         
         for path, matches, dist in results:
             item = QListWidgetItem()
-            item.setText(f"{os.path.basename(path)}\nScore: {dist:.2f} (Matches: {matches})")
+            item.setText(f"{os.path.basename(path)}\nMatches: {matches} (Distance: {dist:.2f})")
             item.setData(Qt.ItemDataRole.UserRole, path)
             
             # Load thumbnail

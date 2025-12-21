@@ -28,7 +28,7 @@ def test_new_supported_extensions():
 
 def test_similarity_threshold_constant():
     """Test that default similarity threshold is defined."""
-    assert DEFAULT_SIMILARITY_THRESHOLD == 0
+    assert DEFAULT_SIMILARITY_THRESHOLD == 0  # Show all matches with > 0 segments
 
 
 def test_search_thread_with_threshold(qtbot):
@@ -43,12 +43,13 @@ def test_search_thread_with_threshold(qtbot):
         "/path/to/image2.jpg": sample_hash,
     }
     
-    # Test with high threshold - should filter out results
+    # Test with very high threshold - should filter out all results
+    # since matches must be > threshold
     thread = SearchThread(
         image_hashes, 
         sample_hash, 
         max_results=10,
-        similarity_threshold=1000  # Very high, should filter everything
+        similarity_threshold=1000  # Very high, impossible to exceed
     )
     
     results = []
@@ -60,8 +61,7 @@ def test_search_thread_with_threshold(qtbot):
     with qtbot.waitSignal(thread.finished, timeout=5000):
         thread.start()
     
-    # High threshold should filter most/all results
-    # since matches must be > threshold
+    # Very high threshold should filter all results
     assert len(results) == 0
 
 

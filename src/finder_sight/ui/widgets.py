@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QLabel
-from PyQt6.QtCore import pyqtSignal, Qt
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMouseEvent
+from PyQt6.QtCore import pyqtSignal, Qt, QSize
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMouseEvent, QPixmap
 
 class ClickableLabel(QLabel):
     clicked = pyqtSignal()
@@ -19,7 +19,9 @@ class DropLabel(QLabel):
 
     def __init__(self, title):
         super().__init__(title)
+        self.default_title = title
         self.setAcceptDrops(True)
+        self._preview_pixmap = None
         self.default_style = """
             QLabel {
                 border: 2px dashed #aaa;
@@ -42,6 +44,13 @@ class DropLabel(QLabel):
                 background-color: #e3f2fd;
             }
         """
+        self.preview_style = """
+            QLabel {
+                border: 2px solid #4CAF50;
+                border-radius: 10px;
+                background-color: #f5f5f5;
+            }
+        """
         self.setStyleSheet(self.default_style)
 
     def dragEnterEvent(self, event: QDragEnterEvent):
@@ -50,23 +59,58 @@ class DropLabel(QLabel):
             self.setStyleSheet(self.drag_active_style)
 
     def dragLeaveEvent(self, event):
-        self.setStyleSheet(self.default_style)
+        if self._preview_pixmap:
+            self.setStyleSheet(self.preview_style)
+        else:
+            self.setStyleSheet(self.default_style)
             
     def dragMoveEvent(self, event):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
 
     def dropEvent(self, event: QDropEvent):
-        self.setStyleSheet(self.default_style)
         urls = event.mimeData().urls()
         if urls:
             file_path = urls[0].toLocalFile()
+            self.set_preview_image(file_path)
             self.dropped.emit(file_path)
+
+    def set_preview_image(self, file_path: str = None, pixmap: QPixmap = None):
+        """Show preview of the search image."""
+        if file_path:
+            pixmap = QPixmap(file_path)
+        
+        if pixmap and not pixmap.isNull():
+            # Scale to fit while maintaining aspect ratio
+            max_size = min(self.width(), self.height()) - 20
+            if max_size < 100:
+                max_size = 150
+            scaled = pixmap.scaled(
+                QSize(max_size, max_size),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            self._preview_pixmap = scaled
+            self.setPixmap(scaled)
+            self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.setStyleSheet(self.preview_style)
 
     def set_searching(self, searching: bool):
         if searching:
             self.setText("Searching...")
-            self.setStyleSheet("QLabel { background-color: #e6f3ff; border: 2px solid #2196F3; }")
+            self._preview_pixmap = None
+            self.setStyleSheet("QLabel { background-color: #e6f3ff; border: 2px solid #2196F3; font-size: 24px; }")
         else:
-            self.setText("Drag & Drop Image Here\nor Paste (Cmd+V)")
-            self.setStyleSheet(self.default_style)
+            if self._preview_pixmap:
+                self.setPixmap(self._preview_pixmap)
+                self.setStyleSheet(self.preview_style)
+            else:
+                self.setText(self.default_title)
+                self.setStyleSheet(self.default_style)
+
+    def clear_preview(self):
+        """Clear the preview and restore default state."""
+        self._preview_pixmap = None
+        self.setText(self.default_title)
+        self.setStyleSheet(self.default_style)
+
