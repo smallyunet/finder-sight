@@ -19,7 +19,7 @@ from src.finder_sight.constants import (
 )
 from src.finder_sight.core.indexer import IndexerThread, IndexLoaderThread
 from src.finder_sight.core.searcher import SearchThread
-from src.finder_sight.ui.widgets import DropLabel, ClickableLabel
+from src.finder_sight.ui.widgets import DropLabel, ClickableLabel, ResultWidget
 from src.finder_sight.ui.settings_dialog import SettingsDialog
 from src.finder_sight.utils.logger import logger
 
@@ -43,9 +43,18 @@ class ImageFinderApp(QMainWindow):
         self.max_results = DEFAULT_MAX_RESULTS
         
         self.init_ui()
+        self.load_stylesheet()  # Load styles
         self.create_menu_bar()
         self.load_config()
         self.load_index()
+
+    def load_stylesheet(self):
+        try:
+            style_path = os.path.join(os.path.dirname(__file__), "style.qss")
+            with open(style_path, "r") as f:
+                self.setStyleSheet(f.read())
+        except Exception as e:
+            logger.warning(f"Failed to load stylesheet: {e}")
 
     def init_ui(self):
         main_widget = QWidget()
@@ -64,6 +73,7 @@ class ImageFinderApp(QMainWindow):
         self.btn_add_dir.setShortcut("Ctrl+O")
         
         self.btn_remove_dir = QPushButton("Remove Directory")
+        self.btn_remove_dir.setObjectName("RemoveDirButton")
         self.btn_remove_dir.clicked.connect(self.remove_directory)
         self.btn_remove_dir.setShortcut("Backspace")
 
@@ -71,10 +81,12 @@ class ImageFinderApp(QMainWindow):
         self.btn_index.clicked.connect(self.start_indexing)
         
         self.btn_cancel = QPushButton("Cancel")
+        self.btn_cancel.setObjectName("CancelButton")
         self.btn_cancel.clicked.connect(self.cancel_indexing)
         self.btn_cancel.setEnabled(False)
         
         self.btn_clear_index = QPushButton("Clear Index")
+        self.btn_clear_index.setObjectName("RemoveDirButton") # Reuse similar style
         self.btn_clear_index.clicked.connect(self.clear_index)
         
         top_btn_layout.addWidget(self.btn_add_dir)
@@ -90,6 +102,7 @@ class ImageFinderApp(QMainWindow):
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
         self.lbl_status = QLabel("Ready")
+        self.lbl_status.setObjectName("StatusLabel")
         
         index_layout.addLayout(top_btn_layout)
         index_layout.addWidget(self.dir_list)
@@ -99,6 +112,7 @@ class ImageFinderApp(QMainWindow):
         layout.addWidget(index_group)
 
         self.drop_zone = DropLabel("Drag & Drop Image Here\nor Paste (Cmd+V)")
+        self.drop_zone.setObjectName("DropZone")
         self.drop_zone.dropped.connect(lambda path: self.search_image(file_path=path))
         self.drop_zone.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.drop_zone.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -436,17 +450,23 @@ class ImageFinderApp(QMainWindow):
         
         for path, dist in results:
             item = QListWidgetItem()
-            item.setText(f"{os.path.basename(path)}\nDistance: {dist:.2f}")
+            # item.setText(f"{os.path.basename(path)}\nDistance: {dist:.2f}") # Handled by widget now
             item.setData(Qt.ItemDataRole.UserRole, path)
             
             # Load thumbnail
+            pixmap = QPixmap()
             reader = QImageReader(path)
             reader.setScaledSize(QSize(THUMBNAIL_SIZE, THUMBNAIL_SIZE))
             img = reader.read()
             if not img.isNull():
-                item.setIcon(QIcon(QPixmap.fromImage(img)))
+                pixmap = QPixmap.fromImage(img)
+            
+            # Create custom widget
+            widget = ResultWidget(path, dist, pixmap)
+            item.setSizeHint(widget.sizeHint())
             
             self.result_list.addItem(item)
+            self.result_list.setItemWidget(item, widget)
 
     def on_result_double_clicked(self, item):
         path = item.data(Qt.ItemDataRole.UserRole)

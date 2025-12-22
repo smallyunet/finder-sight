@@ -1,8 +1,10 @@
-from PyQt6.QtWidgets import QLabel
+from PyQt6.QtWidgets import QLabel, QWidget, QHBoxLayout, QVBoxLayout, QFrame
 from PyQt6.QtCore import pyqtSignal, Qt, QSize
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMouseEvent, QPixmap
+import os
 
 class ClickableLabel(QLabel):
+
     clicked = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -22,47 +24,23 @@ class DropLabel(QLabel):
         self.default_title = title
         self.setAcceptDrops(True)
         self._preview_pixmap = None
-        self.default_style = """
-            QLabel {
-                border: 2px dashed #aaa;
-                border-radius: 10px;
-                font-size: 24px;
-                color: #555;
-                background-color: #f9f9f9;
-            }
-            QLabel:hover {
-                background-color: #f0f0f0;
-                border-color: #888;
-            }
-        """
-        self.drag_active_style = """
-            QLabel {
-                border: 2px dashed #2196F3;
-                border-radius: 10px;
-                font-size: 24px;
-                color: #2196F3;
-                background-color: #e3f2fd;
-            }
-        """
-        self.preview_style = """
-            QLabel {
-                border: 2px solid #4CAF50;
-                border-radius: 10px;
-                background-color: #f5f5f5;
-            }
-        """
-        self.setStyleSheet(self.default_style)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setProperty("state", "idle")
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
-            self.setStyleSheet(self.drag_active_style)
+            self.setProperty("state", "dragging")
+            self.style().unpolish(self)
+            self.style().polish(self)
 
     def dragLeaveEvent(self, event):
         if self._preview_pixmap:
-            self.setStyleSheet(self.preview_style)
+            self.setProperty("state", "preview")
         else:
-            self.setStyleSheet(self.default_style)
+            self.setProperty("state", "idle")
+        self.style().unpolish(self)
+        self.style().polish(self)
             
     def dragMoveEvent(self, event):
         if event.mimeData().hasUrls():
@@ -82,7 +60,8 @@ class DropLabel(QLabel):
         
         if pixmap and not pixmap.isNull():
             # Scale to fit while maintaining aspect ratio
-            max_size = min(self.width(), self.height()) - 20
+            # Use smaller dimension to ensure it fits well
+            max_size = min(self.width(), self.height()) - 40
             if max_size < 100:
                 max_size = 150
             scaled = pixmap.scaled(
@@ -92,25 +71,72 @@ class DropLabel(QLabel):
             )
             self._preview_pixmap = scaled
             self.setPixmap(scaled)
-            self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.setStyleSheet(self.preview_style)
+            self.setProperty("state", "preview")
+            self.style().unpolish(self)
+            self.style().polish(self)
 
     def set_searching(self, searching: bool):
         if searching:
             self.clear() # Clear current display (text or pixmap)
-            self.setText("Searching...")
-            self.setStyleSheet("QLabel { background-color: #e6f3ff; border: 2px solid #2196F3; font-size: 24px; }")
+            self.setText("🔍 Searching...")
+            self.setProperty("state", "searching")
         else:
             if self._preview_pixmap:
                 self.setPixmap(self._preview_pixmap)
-                self.setStyleSheet(self.preview_style)
+                self.setProperty("state", "preview")
             else:
                 self.setText(self.default_title)
-                self.setStyleSheet(self.default_style)
+                self.setProperty("state", "idle")
+        
+        self.style().unpolish(self)
+        self.style().polish(self)
 
     def clear_preview(self):
         """Clear the preview and restore default state."""
         self._preview_pixmap = None
         self.setText(self.default_title)
-        self.setStyleSheet(self.default_style)
+        self.setProperty("state", "idle")
+        self.style().unpolish(self)
+        self.style().polish(self)
 
+
+class ResultWidget(QWidget):
+    def __init__(self, path: str, distance: float, pixmap: QPixmap):
+        super().__init__()
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setSpacing(10)
+        
+        # Thumbnail
+        self.lbl_thumb = QLabel()
+        if not pixmap.isNull():
+            self.lbl_thumb.setPixmap(pixmap.scaled(
+                60, 60, 
+                Qt.AspectRatioMode.KeepAspectRatio, 
+                Qt.TransformationMode.SmoothTransformation
+            ))
+        self.lbl_thumb.setFixedSize(60, 60)
+        self.lbl_thumb.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_thumb.setStyleSheet("background-color: #eee; border-radius: 4px;")
+        layout.addWidget(self.lbl_thumb)
+        
+        # Info
+        info_layout = QVBoxLayout()
+        info_layout.setSpacing(2)
+        
+        self.lbl_name = QLabel(os.path.basename(path))
+        self.lbl_name.setStyleSheet("font-weight: bold; font-size: 14px; color: #333;")
+        
+        self.lbl_path = QLabel(path)
+        self.lbl_path.setStyleSheet("color: #888; font-size: 11px;")
+        # Truncate path if too long? For now let it expand
+        
+        self.lbl_dist = QLabel(f"Distance: {distance:.2f}")
+        self.lbl_dist.setStyleSheet("color: #007AFF; font-size: 11px; font-weight: 500;")
+        
+        info_layout.addWidget(self.lbl_name)
+        info_layout.addWidget(self.lbl_path)
+        info_layout.addWidget(self.lbl_dist)
+        info_layout.addStretch()
+        
+        layout.addLayout(info_layout)
