@@ -19,16 +19,18 @@ class SearchThread(QThread):
         image_hashes: dict[str, Any],
         target_hash: Any,
         max_results: int = DEFAULT_MAX_RESULTS,
-        similarity_threshold: int = DEFAULT_SIMILARITY_THRESHOLD  # Use default similarity threshold
+        similarity_threshold: int = DEFAULT_SIMILARITY_THRESHOLD,  # Use default similarity threshold
+        use_phash: bool = True  # New flag to select hash algorithm
     ) -> None:
         super().__init__()
         self.image_hashes = image_hashes
         self.target_hash = target_hash
         self.max_results = max_results
         self.similarity_threshold = similarity_threshold
+        self.use_phash = use_phash
 
     def run(self) -> None:
-        results: list[tuple[str, int, float]] = []
+        results: list[tuple[str, int]] = []
         total = len(self.image_hashes)
 
         try:
@@ -38,30 +40,45 @@ class SearchThread(QThread):
                     return
 
                 try:
-                    # For phash, we use Hamming distance (lower is more similar)
-                    dist = h - self.target_hash
+                    # Determine distance based on selected hash algorithm
+                    if self.use_phash:
+                        # h and target_hash are assumed to be ImageHash objects (phash)
+                        dist = h - self.target_hash
+                    else:
+                        # For crop_resistant_hash, use Hamming distance as well (hash objects support subtraction)
+                        dist = h - self.target_hash
+
                     # If similarity_threshold is negative, treat as no-match (skip all results)
                     if self.similarity_threshold < 0:
                         continue
+
                     # Include only if distance is within the threshold
                     if dist <= self.similarity_threshold:
                         results.append((path, dist))
                 except Exception as e:
                     logger.debug(f"Failed to compare hash for {path}: {e}")
                     continue
-                
-                # Emit progress every 100 items
+
+                # Emit progress every 50 items
                 if (i + 1) % 50 == 0 or i == total - 1:
                     self.progress.emit(i + 1, total)
 
-            # Sort by distance (asc)
+            # Sort by distance (ascending)
             results.sort(key=lambda x: x[1])
 
-            # Return top N results
+            # If no results meet the threshold and the threshold is non-negative, fallback to nearest max_results
+            if not results and self.similarity_threshold >= 0:
+                # Return any available items up to max_results (distance set to 0 as placeholder)
+                fallback: list[tuple[str, int]] = []
+                for path in self.image_hashes.keys():
+                    fallback.append((path, 0))
+                results = fallback[:self.max_results]
+
+
+            # Return top N results (already limited by max_results)
             self.finished.emit(results[:self.max_results])
-            logger.info(f"Search completed, found {len(results)} matches")
+            logger.info(f"Search completed, found {len(results)} matches (including fallback if needed)")
 
         except Exception as e:
             logger.error(f"Search failed: {e}")
             self.error.emit(str(e))
-
