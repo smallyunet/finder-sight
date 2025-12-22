@@ -118,7 +118,7 @@ class ImageFinderApp(QMainWindow):
         # Removed label to save space, or make it very small
         
         self.dir_list = QListWidget()
-        self.dir_list.setFixedHeight(60) # Reduced height
+        self.dir_list.setFixedHeight(100) # Increased height for visibility
         self.dir_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.dir_list.setToolTip("Indexed Directories")
         layout.addWidget(self.dir_list)
@@ -129,21 +129,21 @@ class ImageFinderApp(QMainWindow):
         self.drop_zone.dropped.connect(lambda path: self.search_image(file_path=path))
         self.drop_zone.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.drop_zone.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed) # Fixed vertical policy
-        self.drop_zone.setMinimumHeight(100) # Significantly reduced
+        self.drop_zone.setMinimumHeight(100)
         self.drop_zone.setMaximumHeight(150)
         self.drop_zone.setToolTip("Drag & Drop or Paste Image to Search")
         layout.addWidget(self.drop_zone)
 
         # --- Status & Progress ---
-        status_layout = QHBoxLayout()
-        status_layout.setSpacing(6)
+        status_layout = QVBoxLayout() # Stack vertical
+        status_layout.setSpacing(4)
         
         self.lbl_status = QLabel("Ready")
         self.lbl_status.setObjectName("StatusLabel")
         
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
-        self.progress_bar.setFixedHeight(4) # Thinner
+        self.progress_bar.setFixedHeight(6) # Thinner but visible
         
         status_layout.addWidget(self.lbl_status)
         status_layout.addWidget(self.progress_bar)
