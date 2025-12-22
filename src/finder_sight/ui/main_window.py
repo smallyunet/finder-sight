@@ -60,17 +60,17 @@ class ImageFinderApp(QMainWindow):
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
         
-        # Main Layout
+        # Main Layout (Compact)
         layout = QVBoxLayout(main_widget)
-        layout.setSpacing(16)
-        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(8) # Reduced spacing
+        layout.setContentsMargins(12, 12, 12, 12) # Reduced margins
 
         # --- Top Control Section ---
         controls_layout = QHBoxLayout()
-        controls_layout.setSpacing(12)
+        controls_layout.setSpacing(8)
 
         # Directory Group
-        self.btn_add_dir = QPushButton("Add Directory")
+        self.btn_add_dir = QPushButton("Add Folder") # Shorter text
         self.btn_add_dir.clicked.connect(self.add_directory)
         self.btn_add_dir.setShortcut("Ctrl+O")
         self.btn_add_dir.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -92,17 +92,17 @@ class ImageFinderApp(QMainWindow):
         controls_layout.addWidget(line)
 
         # Indexing Group
-        self.btn_index = QPushButton("Start Indexing")
+        self.btn_index = QPushButton("Index") # Shorter text
         self.btn_index.clicked.connect(self.start_indexing)
         self.btn_index.setCursor(Qt.CursorShape.PointingHandCursor)
         
-        self.btn_cancel = QPushButton("Cancel")
+        self.btn_cancel = QPushButton("Stop")
         self.btn_cancel.setObjectName("DangerButton")
         self.btn_cancel.clicked.connect(self.cancel_indexing)
         self.btn_cancel.setEnabled(False)
         self.btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
         
-        self.btn_clear_index = QPushButton("Clear Index")
+        self.btn_clear_index = QPushButton("Clear")
         self.btn_clear_index.setObjectName("SecondaryButton")
         self.btn_clear_index.clicked.connect(self.clear_index)
         self.btn_clear_index.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -115,35 +115,35 @@ class ImageFinderApp(QMainWindow):
         layout.addLayout(controls_layout)
 
         # --- Directory List Section ---
-        # Label for the list
-        lbl_dirs = QLabel("Indexed Directories:")
-        lbl_dirs.setStyleSheet("font-weight: 600; color: #1d1d1f; margin-bottom: 4px;")
-        layout.addWidget(lbl_dirs)
-
+        # Removed label to save space, or make it very small
+        
         self.dir_list = QListWidget()
-        self.dir_list.setFixedHeight(100)
+        self.dir_list.setFixedHeight(60) # Reduced height
         self.dir_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        self.dir_list.setToolTip("Indexed Directories")
         layout.addWidget(self.dir_list)
         
         # --- Drop Zone Section ---
-        self.drop_zone = DropLabel("Drag & Drop Image Here\nor Paste (Cmd+V)")
+        self.drop_zone = DropLabel("Drag Image Here / Paste (Cmd+V)")
         self.drop_zone.setObjectName("DropZone")
         self.drop_zone.dropped.connect(lambda path: self.search_image(file_path=path))
         self.drop_zone.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.drop_zone.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.drop_zone.setMinimumHeight(200)
-        self.drop_zone.setToolTip("You can also copy an image to clipboard and paste it here.")
+        self.drop_zone.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed) # Fixed vertical policy
+        self.drop_zone.setMinimumHeight(100) # Significantly reduced
+        self.drop_zone.setMaximumHeight(150)
+        self.drop_zone.setToolTip("Drag & Drop or Paste Image to Search")
         layout.addWidget(self.drop_zone)
 
         # --- Status & Progress ---
         status_layout = QHBoxLayout()
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setFixedHeight(6)
+        status_layout.setSpacing(6)
         
         self.lbl_status = QLabel("Ready")
         self.lbl_status.setObjectName("StatusLabel")
-        self.lbl_status.setStyleSheet("color: #86868b; font-size: 13px;")
+        
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setFixedHeight(4) # Thinner
         
         status_layout.addWidget(self.lbl_status)
         status_layout.addWidget(self.progress_bar)
@@ -151,17 +151,18 @@ class ImageFinderApp(QMainWindow):
 
         # --- Results Section ---
         result_group = QFrame()
-        result_group.setFrameShape(QFrame.Shape.NoFrame) # We'll just use the list widget styling
+        result_group.setFrameShape(QFrame.Shape.NoFrame)
         result_layout = QVBoxLayout(result_group)
-        result_layout.setContentsMargins(0, 10, 0, 0)
-        result_layout.setSpacing(8)
+        result_layout.setContentsMargins(0, 4, 0, 0)
+        result_layout.setSpacing(4)
         
-        lbl_results = QLabel("Search Results (Double click to reveal):")
-        lbl_results.setStyleSheet("font-weight: 600; color: #1d1d1f;")
+        # Results Header
+        lbl_results = QLabel("Matches:")
+        lbl_results.setStyleSheet("font-weight: 600; color: #1d1d1f; font-size: 12px;")
         result_layout.addWidget(lbl_results)
 
         self.result_list = QListWidget()
-        self.result_list.setIconSize(QSize(64, 64))
+        self.result_list.setIconSize(QSize(40, 40)) # Match new widget thumbnail
         self.result_list.itemDoubleClicked.connect(self.on_result_double_clicked)
         self.result_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.result_list.customContextMenuRequested.connect(self.show_context_menu)
@@ -169,6 +170,7 @@ class ImageFinderApp(QMainWindow):
         
         result_layout.addWidget(self.result_list)
         layout.addWidget(result_group)
+
 
     def add_directory(self):
         dir_path = QFileDialog.getExistingDirectory(self, "Select Directory")

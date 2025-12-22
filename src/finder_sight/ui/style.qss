@@ -7,20 +7,22 @@ QMainWindow {
 /* Group Frames and Containers */
 QFrame {
     background-color: transparent;
+    margin: 0px;
+    padding: 0px;
 }
 
 QListWidget {
     background-color: #ffffff;
     border: 1px solid #d1d1d6;
-    border-radius: 10px;
+    border-radius: 8px; /* Slightly sharper corners */
     outline: none;
-    font-size: 13px;
-    padding: 6px;
+    font-size: 12px; /* Smaller base font */
+    padding: 2px; /* Tighter padding */
 }
 QListWidget::item {
-    border-radius: 6px;
-    padding: 6px;
-    margin-bottom: 2px;
+    border-radius: 4px;
+    padding: 2px; /* Very tight item padding */
+    margin-bottom: 0px;
 }
 QListWidget::item:selected {
     background-color: #007AFF;
@@ -34,12 +36,12 @@ QListWidget::item:hover:!selected {
 QPushButton {
     background-color: #ffffff;
     border: 1px solid #d1d1d6;
-    border-radius: 6px;
+    border-radius: 5px;
     color: #1d1d1f;
-    font-size: 13px;
+    font-size: 12px; /* Compact font */
     font-weight: 500;
-    padding: 4px 12px;
-    min-height: 22px;
+    padding: 2px 10px; /* Reduced vertical padding */
+    min-height: 20px;
 }
 QPushButton:hover {
     background-color: #f2f2f7;
@@ -54,7 +56,7 @@ QPushButton:disabled {
     border-color: #e5e5ea;
 }
 
-/* Primary Action Buttons (e.g. Start Indexing, Add) */
+/* Primary Action Buttons */
 QPushButton#PrimaryButton, QPushButton[text="Start Indexing"], QPushButton[text="Add Directory"] {
     background-color: #007AFF;
     border: 1px solid #007AFF;
@@ -68,7 +70,7 @@ QPushButton#PrimaryButton:pressed, QPushButton[text="Start Indexing"]:pressed, Q
     background-color: #0051a8;
 }
 
-/* Danger Buttons (e.g. Cancel) */
+/* Danger Buttons */
 QPushButton#DangerButton {
     color: #ff3b30;
     border-color: #ff3b30;
@@ -85,6 +87,7 @@ QPushButton#SecondaryButton {
     background-color: transparent;
     border: none;
     color: #007AFF;
+    padding: 2px 6px;
 }
 QPushButton#SecondaryButton:hover {
     text-decoration: underline;
@@ -94,9 +97,9 @@ QPushButton#SecondaryButton:hover {
 QLabel#DropZone {
     background-color: #ffffff;
     border: 2px dashed #c7c7cc;
-    border-radius: 12px;
+    border-radius: 8px;
     color: #86868b;
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 500;
 }
 QLabel#DropZone[state="dragging"] {
@@ -118,26 +121,26 @@ QLabel#DropZone[state="preview"] {
 QProgressBar {
     border: none;
     background-color: #e5e5ea;
-    border-radius: 3px;
+    border-radius: 2px;
     text-align: center;
 }
 QProgressBar::chunk {
     background-color: #34c759;
-    border-radius: 3px;
+    border-radius: 2px;
 }
 
-/* Scrollbars (Subtle macOS style) */
+/* Scrollbars */
 QScrollBar:vertical {
     border: none;
     background: transparent;
-    width: 10px;
+    width: 8px; /* Thinner scrollbar */
     margin: 0px;
 }
 QScrollBar::handle:vertical {
     background: #c7c7cc;
     min-height: 20px;
-    border-radius: 5px;
-    margin: 2px;
+    border-radius: 4px;
+    margin: 1px;
 }
 QScrollBar::handle:vertical:hover {
     background: #aeaeb2;
@@ -146,15 +149,12 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
     height: 0px;
 }
 
-/* Dialogs */
-QDialog {
-    background-color: #f5f5f7;
-}
-
 /* Labels */
 QLabel {
     color: #1d1d1f;
 }
 QLabel#StatusLabel {
     color: #86868b;
+    font-size: 11px;
 }
+

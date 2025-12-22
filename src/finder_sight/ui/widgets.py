@@ -103,25 +103,24 @@ class DropLabel(QLabel):
 class ResultWidget(QWidget):
     def __init__(self, path: str, distance: float, pixmap: QPixmap):
         super().__init__()
-        # Main layout
+        # Main layout - Compact
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(15, 12, 15, 12)
-        layout.setSpacing(15)
+        layout.setContentsMargins(6, 4, 6, 4)
+        layout.setSpacing(10)
         
-        # Thumbnail container
+        # Thumbnail container (Smaller)
         thumb_container = QLabel()
-        thumb_container.setFixedSize(70, 70)
+        thumb_container.setFixedSize(42, 42)
         thumb_container.setAlignment(Qt.AlignmentFlag.AlignCenter)
         thumb_container.setStyleSheet("""
             background-color: #f0f0f0; 
-            border-radius: 6px; 
+            border-radius: 4px; 
             border: 1px solid #e0e0e0;
         """)
         
         if not pixmap.isNull():
-            # Scale pixmap to fit within container while preserving aspect ratio
             scaled_pixmap = pixmap.scaled(
-                QSize(64, 64), 
+                QSize(40, 40), 
                 Qt.AspectRatioMode.KeepAspectRatio, 
                 Qt.TransformationMode.SmoothTransformation
             )
@@ -131,37 +130,39 @@ class ResultWidget(QWidget):
         
         # Info container
         info_layout = QVBoxLayout()
-        info_layout.setSpacing(4)
+        info_layout.setSpacing(0) # Minimal vertical spacing
         info_layout.setContentsMargins(0, 2, 0, 2)
         
-        # Filename
+        # Top Row: Name + Score
+        top_row = QHBoxLayout()
+        top_row.setSpacing(8)
+        
         file_name = os.path.basename(path)
         self.lbl_name = QLabel(file_name)
-        self.lbl_name.setStyleSheet("font-size: 14px; font-weight: 600; color: #1d1d1f;")
+        self.lbl_name.setStyleSheet("font-size: 13px; font-weight: 600; color: #1d1d1f;")
         
-        # Path
-        self.lbl_path = QLabel(path)
-        self.lbl_path.setStyleSheet("font-size: 12px; color: #86868b;")
-        self.lbl_path.setWordWrap(False)
-        self.lbl_path.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
-
-        # Distance / Score
-        similarity_text = f"Similarity Distance: {distance:.2f}"
+        similarity_text = f"Dist: {distance:.2f}"
         self.lbl_dist = QLabel(similarity_text)
         self.lbl_dist.setStyleSheet("""
             font-size: 11px; 
             font-weight: 500; 
             color: #007AFF; 
-            background-color: #e3f2fd; 
-            border-radius: 4px; 
-            padding: 2px 6px;
+            padding: 0px 4px;
         """)
         self.lbl_dist.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         
-        info_layout.addWidget(self.lbl_name)
+        top_row.addWidget(self.lbl_name)
+        top_row.addWidget(self.lbl_dist)
+        top_row.addStretch()
+        
+        # Bottom Row: Path
+        self.lbl_path = QLabel(path)
+        self.lbl_path.setStyleSheet("font-size: 11px; color: #86868b;")
+        self.lbl_path.setWordWrap(False)
+        self.lbl_path.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
+        
+        info_layout.addLayout(top_row)
         info_layout.addWidget(self.lbl_path)
-        info_layout.addWidget(self.lbl_dist)
-        info_layout.addStretch()
         
         layout.addLayout(info_layout)
 
