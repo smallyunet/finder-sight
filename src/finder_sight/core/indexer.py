@@ -26,8 +26,8 @@ def calculate_hash(file_path: str) -> tuple[str, Optional[str]]:
             # Convert to RGB to handle various image modes
             if img.mode != 'RGB':
                 img = img.convert('RGB')
-            # phash is better for general similarity and exact matching
-            h = imagehash.phash(img)
+            # whash is generally more robust for resized/modified images
+            h = imagehash.whash(img)
             return file_path, str(h)
     except Exception as e:
         # Logging happens in main process, just return None
@@ -160,8 +160,28 @@ class IndexLoaderThread(QThread):
         try:
             import json
             with open(self.index_file, 'r') as f:
-                index_data = json.load(f)
+                data = json.load(f)
             
+            # Check version
+            from src.finder_sight.constants import INDEX_VERSION
+            
+            # Support legacy (flat dict) vs new (versioned dict)
+            if "version" in data and "data" in data:
+                loaded_version = data["version"]
+                index_data = data["data"]
+                
+                if loaded_version != INDEX_VERSION:
+                    logger.warning(f"Index version mismatch: {loaded_version} != {INDEX_VERSION}. Ignoring old index.")
+                    self.finished.emit({}, {})
+                    return
+            else:
+                # Legacy file is treated as incompatible if we enforced versioning
+                # But for migration we can check. Since we are moving phash -> whash, they are NOT compatible.
+                # So we must drop legacy index.
+                logger.warning("Legacy index detected. Ignoring incompatible index.")
+                self.finished.emit({}, {})
+                return
+
             hash_data = {}
             for path, hash_str in index_data.items():
                 try:
@@ -171,6 +191,9 @@ class IndexLoaderThread(QThread):
                     pass
             
             self.finished.emit(index_data, hash_data)
+            
+        except Exception as e:
+            self.error.emit(str(e))
             
         except Exception as e:
             self.error.emit(str(e))

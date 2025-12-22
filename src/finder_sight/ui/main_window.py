@@ -15,7 +15,7 @@ import imagehash
 
 from src.finder_sight.constants import (
     INDEX_FILE, CONFIG_FILE, THUMBNAIL_SIZE,
-    DEFAULT_MAX_RESULTS, DEFAULT_SIMILARITY_THRESHOLD
+    DEFAULT_MAX_RESULTS, DEFAULT_SIMILARITY_THRESHOLD, INDEX_VERSION
 )
 from src.finder_sight.core.indexer import IndexerThread, IndexLoaderThread
 from src.finder_sight.core.searcher import SearchThread
@@ -242,8 +242,7 @@ class ImageFinderApp(QMainWindow):
             logger.warning(f"{hash_load_failures} hashes failed to load")
                 
         self.image_index.update(index_data)
-        self.save_index()
-        self.save_index()
+        self.save_index() # Save with new version structure
         self.btn_index.setEnabled(True)
         self.btn_cancel.setEnabled(False)
         self.btn_clear_index.setEnabled(True)
@@ -259,9 +258,14 @@ class ImageFinderApp(QMainWindow):
 
     def save_index(self):
         try:
+            # Save detailed structure with version
+            data = {
+                "version": INDEX_VERSION,
+                "data": self.image_index
+            }
             with open(INDEX_FILE, 'w') as f:
-                json.dump(self.image_index, f)
-            logger.debug(f"Index saved with {len(self.image_index)} entries")
+                json.dump(data, f)
+            logger.debug(f"Index saved with {len(self.image_index)} entries (v{INDEX_VERSION})")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save index: {e}")
             logger.error(f"Failed to save index: {e}")
@@ -272,16 +276,28 @@ class ImageFinderApp(QMainWindow):
         self.btn_add_dir.setEnabled(False)
         self.btn_remove_dir.setEnabled(False)
         
+        # We need to custom handle the thread because we changed the file format
         self.index_loader_thread = IndexLoaderThread(INDEX_FILE)
         self.index_loader_thread.finished.connect(self.on_index_loaded)
         self.index_loader_thread.error.connect(self.on_index_load_error)
         self.index_loader_thread.start()
 
     def on_index_loaded(self, index_data, hash_data):
+        # Check version if provided in the loaded data
+        # Note: IndexLoaderThread needs to be updated too, or we handle it here if it returns raw data?
+        # Let's fix IndexLoaderThread first or handle the dict structure it returns.
+        pass # Will be replaced by next chunk logic 
+
+
+    def on_index_loaded(self, index_data, hash_data):
         self.image_index = index_data
         self.image_hashes = hash_data
         
-        self.lbl_status.setText(f"Loaded index with {len(self.image_index)} images.")
+        if not self.image_index:
+             self.lbl_status.setText("Index outdated or empty. Please re-index.")
+        else:
+             self.lbl_status.setText(f"Loaded index with {len(self.image_index)} images.")
+        
         logger.info(f"Loaded index with {len(self.image_index)} images")
         
         self.btn_index.setEnabled(True)
@@ -438,7 +454,7 @@ class ImageFinderApp(QMainWindow):
                     # Convert to RGB for consistency
                     if img.mode != 'RGB':
                         img = img.convert('RGB')
-                    target_hash = imagehash.phash(img)
+                    target_hash = imagehash.whash(img)
             elif image_data:
                 self.lbl_status.setText("Processing pasted image...")
                 # Convert QImage to PIL Image
@@ -448,7 +464,7 @@ class ImageFinderApp(QMainWindow):
                 pil_im = Image.open(io.BytesIO(buffer.data()))
                 if pil_im.mode != 'RGB':
                     pil_im = pil_im.convert('RGB')
-                target_hash = imagehash.phash(pil_im)
+                target_hash = imagehash.whash(pil_im)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to process input image: {e}")
             return

@@ -12,8 +12,12 @@ SUPPORTED_EXTENSIONS = {
 
 # Search settings
 DEFAULT_MAX_RESULTS = 20
-DEFAULT_SIMILARITY_THRESHOLD = 10  # Max Hamming distance for phash (dist <= threshold)
-DEFAULT_PHASH_THRESHOLD = 15  # More permissive default for fallback searches
+DEFAULT_SIMILARITY_THRESHOLD = 12  # Hamming distance for whash
+DEFAULT_PHASH_THRESHOLD = 15  # Fallback
+
+# Indexing
+INDEX_VERSION = "v2_whash"  # Increment to force re-indexing
+
 
 # UI settings
 THUMBNAIL_SIZE = 100
