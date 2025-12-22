@@ -19,7 +19,7 @@ class SearchThread(QThread):
         image_hashes: dict[str, Any],
         target_hash: Any,
         max_results: int = DEFAULT_MAX_RESULTS,
-        similarity_threshold: int = 1000  # Effectively include all images by default
+        similarity_threshold: int = DEFAULT_SIMILARITY_THRESHOLD  # Use default similarity threshold
     ) -> None:
         super().__init__()
         self.image_hashes = image_hashes
@@ -40,18 +40,18 @@ class SearchThread(QThread):
                 try:
                     # For phash, we use Hamming distance (lower is more similar)
                     dist = h - self.target_hash
-                    # If similarity_threshold is negative, treat as no-match (retain original test behavior)
+                    # If similarity_threshold is negative, treat as no-match (skip all results)
                     if self.similarity_threshold < 0:
-                        # Do not include this result
                         continue
-                    # Otherwise, always include the result regardless of distance
-                    results.append((path, dist))
+                    # Include only if distance is within the threshold
+                    if dist <= self.similarity_threshold:
+                        results.append((path, dist))
                 except Exception as e:
                     logger.debug(f"Failed to compare hash for {path}: {e}")
                     continue
                 
                 # Emit progress every 100 items
-                if (i + 1) % 100 == 0 or i == total - 1:
+                if (i + 1) % 50 == 0 or i == total - 1:
                     self.progress.emit(i + 1, total)
 
             # Sort by distance (asc)

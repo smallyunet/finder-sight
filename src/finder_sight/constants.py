@@ -6,7 +6,8 @@ SUPPORTED_EXTENSIONS = {
     '.jpg', '.jpeg', '.png', '.webp', '.bmp',
     '.gif',  # GIF images
     '.heic', '.heif',  # Apple HEIC format
-    '.tiff', '.tif'  # TIFF images
+    '.tiff', '.tif',  # TIFF images
+    '.svg', '.ico'  # New formats
 }
 
 # Search settings
