@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QLabel, QWidget, QHBoxLayout, QVBoxLayout, QFrame
+from PyQt6.QtWidgets import QLabel, QWidget, QHBoxLayout, QVBoxLayout, QFrame, QSizePolicy
 from PyQt6.QtCore import pyqtSignal, Qt, QSize
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMouseEvent, QPixmap
 import os
@@ -103,36 +103,60 @@ class DropLabel(QLabel):
 class ResultWidget(QWidget):
     def __init__(self, path: str, distance: float, pixmap: QPixmap):
         super().__init__()
+        # Main layout
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(5, 5, 5, 5)
-        layout.setSpacing(10)
+        layout.setContentsMargins(15, 12, 15, 12)
+        layout.setSpacing(15)
         
-        # Thumbnail
-        self.lbl_thumb = QLabel()
+        # Thumbnail container
+        thumb_container = QLabel()
+        thumb_container.setFixedSize(70, 70)
+        thumb_container.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        thumb_container.setStyleSheet("""
+            background-color: #f0f0f0; 
+            border-radius: 6px; 
+            border: 1px solid #e0e0e0;
+        """)
+        
         if not pixmap.isNull():
-            self.lbl_thumb.setPixmap(pixmap.scaled(
-                60, 60, 
+            # Scale pixmap to fit within container while preserving aspect ratio
+            scaled_pixmap = pixmap.scaled(
+                QSize(64, 64), 
                 Qt.AspectRatioMode.KeepAspectRatio, 
                 Qt.TransformationMode.SmoothTransformation
-            ))
-        self.lbl_thumb.setFixedSize(60, 60)
-        self.lbl_thumb.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_thumb.setStyleSheet("background-color: #eee; border-radius: 4px;")
-        layout.addWidget(self.lbl_thumb)
+            )
+            thumb_container.setPixmap(scaled_pixmap)
         
-        # Info
+        layout.addWidget(thumb_container)
+        
+        # Info container
         info_layout = QVBoxLayout()
-        info_layout.setSpacing(2)
+        info_layout.setSpacing(4)
+        info_layout.setContentsMargins(0, 2, 0, 2)
         
-        self.lbl_name = QLabel(os.path.basename(path))
-        self.lbl_name.setStyleSheet("font-weight: bold; font-size: 14px; color: #333;")
+        # Filename
+        file_name = os.path.basename(path)
+        self.lbl_name = QLabel(file_name)
+        self.lbl_name.setStyleSheet("font-size: 14px; font-weight: 600; color: #1d1d1f;")
         
+        # Path
         self.lbl_path = QLabel(path)
-        self.lbl_path.setStyleSheet("color: #888; font-size: 11px;")
-        # Truncate path if too long? For now let it expand
-        
-        self.lbl_dist = QLabel(f"Distance: {distance:.2f}")
-        self.lbl_dist.setStyleSheet("color: #007AFF; font-size: 11px; font-weight: 500;")
+        self.lbl_path.setStyleSheet("font-size: 12px; color: #86868b;")
+        self.lbl_path.setWordWrap(False)
+        self.lbl_path.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
+
+        # Distance / Score
+        similarity_text = f"Similarity Distance: {distance:.2f}"
+        self.lbl_dist = QLabel(similarity_text)
+        self.lbl_dist.setStyleSheet("""
+            font-size: 11px; 
+            font-weight: 500; 
+            color: #007AFF; 
+            background-color: #e3f2fd; 
+            border-radius: 4px; 
+            padding: 2px 6px;
+        """)
+        self.lbl_dist.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         
         info_layout.addWidget(self.lbl_name)
         info_layout.addWidget(self.lbl_path)
@@ -140,3 +164,4 @@ class ResultWidget(QWidget):
         info_layout.addStretch()
         
         layout.addLayout(info_layout)
+
