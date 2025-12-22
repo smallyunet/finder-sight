@@ -68,11 +68,27 @@ class SearchThread(QThread):
 
             # If no results meet the threshold and the threshold is non-negative, fallback to nearest max_results
             if not results and self.similarity_threshold >= 0:
-                # Return any available items up to max_results (distance set to 0 as placeholder)
+                # Calculate distances for ALL items to find the nearest ones
                 fallback: list[tuple[str, int]] = []
-                for path in self.image_hashes.keys():
-                    fallback.append((path, 0))
+                for path, h in self.image_hashes.items():
+                    try:
+                        # Determine distance based on selected hash algorithm
+                        # We repeat the calculation here to be sure, or we could have stored them.
+                        # Since we want to find the BEST fallback, we must check everything.
+                        if self.use_phash:
+                            dist = h - self.target_hash
+                        else:
+                            dist = h - self.target_hash
+                        fallback.append((path, dist))
+                    except Exception as e:
+                        # Skip invalid hashes
+                        continue
+                
+                # Sort fallback results by distance
+                fallback.sort(key=lambda x: x[1])
+                # Take top N
                 results = fallback[:self.max_results]
+
 
 
             # Return top N results (already limited by max_results)

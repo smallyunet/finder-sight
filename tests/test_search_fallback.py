@@ -11,9 +11,9 @@ import imagehash
 
 @pytest.fixture
 def sample_image_hash():
-    """Create a sample image and return its hash."""
+    """Create a sample image and return its hash using phash."""
     img = Image.new('RGB', (100, 100), color='red')
-    return imagehash.crop_resistant_hash(img)
+    return imagehash.phash(img)
 
 
 @pytest.fixture
