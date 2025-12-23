@@ -12,11 +12,11 @@ SUPPORTED_EXTENSIONS = {
 
 # Search settings
 DEFAULT_MAX_RESULTS = 20
-DEFAULT_SIMILARITY_THRESHOLD = 12  # Hamming distance for whash
+DEFAULT_SIMILARITY_THRESHOLD = 8  # Hamming distance for whash
 DEFAULT_PHASH_THRESHOLD = 15  # Fallback
 
 # Indexing
-INDEX_VERSION = "v2_whash"  # Increment to force re-indexing
+INDEX_VERSION = "v3_mtime"  # Increment to force re-indexing
 
 
 # UI settings

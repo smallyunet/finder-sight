@@ -32,6 +32,7 @@ class ImageFinderApp(QMainWindow):
         
         self.image_index = {}
         self.image_hashes = {} 
+        self.image_mtimes = {}  # Store modification times
         self.directories = []
         self.indexer_thread = None
         self.search_thread = None
@@ -201,7 +202,7 @@ class ImageFinderApp(QMainWindow):
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
         
-        self.indexer_thread = IndexerThread(self.directories, self.image_index)
+        self.indexer_thread = IndexerThread(self.directories, self.image_index, self.image_mtimes)
         self.indexer_thread.progress_update.connect(self.update_progress)
         self.indexer_thread.finished.connect(self.indexing_finished)
         self.indexer_thread.deleted_files.connect(self.on_deleted_files_found)
@@ -221,6 +222,8 @@ class ImageFinderApp(QMainWindow):
                 del self.image_index[path]
             if path in self.image_hashes:
                 del self.image_hashes[path]
+            if path in self.image_mtimes:
+                del self.image_mtimes[path]
         logger.info(f"Removed {len(deleted_paths)} deleted files from index")
 
     def update_progress(self, current, total, current_file):
@@ -228,7 +231,7 @@ class ImageFinderApp(QMainWindow):
         self.progress_bar.setValue(current)
         self.lbl_status.setText(f"Indexing: {os.path.basename(current_file)}")
 
-    def indexing_finished(self, index_data):
+    def indexing_finished(self, index_data, mtime_data):
         # Update hash cache
         hash_load_failures = 0
         for path, hash_str in index_data.items():
@@ -242,6 +245,7 @@ class ImageFinderApp(QMainWindow):
             logger.warning(f"{hash_load_failures} hashes failed to load")
                 
         self.image_index.update(index_data)
+        self.image_mtimes.update(mtime_data)
         self.save_index() # Save with new version structure
         self.btn_index.setEnabled(True)
         self.btn_cancel.setEnabled(False)
@@ -261,7 +265,8 @@ class ImageFinderApp(QMainWindow):
             # Save detailed structure with version
             data = {
                 "version": INDEX_VERSION,
-                "data": self.image_index
+                "data": self.image_index,
+                "mtimes": self.image_mtimes
             }
             with open(INDEX_FILE, 'w') as f:
                 json.dump(data, f)
@@ -289,9 +294,10 @@ class ImageFinderApp(QMainWindow):
         pass # Will be replaced by next chunk logic 
 
 
-    def on_index_loaded(self, index_data, hash_data):
+    def on_index_loaded(self, index_data, hash_data, mtime_data):
         self.image_index = index_data
         self.image_hashes = hash_data
+        self.image_mtimes = mtime_data
         
         if not self.image_index:
              self.lbl_status.setText("Index outdated or empty. Please re-index.")
