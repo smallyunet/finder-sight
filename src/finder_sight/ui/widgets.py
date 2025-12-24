@@ -35,6 +35,8 @@ class DropLabel(QLabel):
         painter = QPainter(self)
         self.style().drawPrimitive(QStyle.PrimitiveElement.PE_Widget, opt, painter, self)
         super().paintEvent(event)
+
+    def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
             self.setProperty("state", "dragging")

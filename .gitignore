@@ -80,3 +80,4 @@ cover/
 # Project specific
 image_index.json
 config.json
+start.sh
