@@ -31,22 +31,23 @@ jobs:
       run: |
         pyinstaller finder_sight.spec
 
-    - name: Create DMG (Optional - simple zip for now)
+    - name: Create DMG
       run: |
-        cd dist
-        zip -r "FinderSight-macOS.zip" "Finder Sight.app"
+        npm install -g create-dmg
+        create-dmg "dist/Finder Sight.app" dist/ || true
+        mv dist/Finder\ Sight*.dmg dist/FinderSight-macOS.dmg
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: FinderSight-macOS
-        path: dist/FinderSight-macOS.zip
+        path: dist/FinderSight-macOS.dmg
 
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v2
       with:
-        files: dist/FinderSight-macOS.zip
+        files: dist/FinderSight-macOS.dmg
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

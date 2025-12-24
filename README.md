@@ -14,6 +14,16 @@ A macOS desktop application for "Reverse Image Search" that helps you find local
 - **Finder Integration**: Reveal the found image directly in macOS Finder with a single click.
 - **Privacy Focused**: All processing happens locally on your machine. No images are uploaded to the cloud.
 
+## Download
+
+
+You can download the latest pre-built version of Finder Sight for macOS from the [Releases](https://github.com/smallyunet/finder-sight/releases) page.
+
+
+1. Download the `FinderSight-macOS.dmg` file.
+2. Open the DMG and drag Finder Sight to your Applications folder.
+3. **Note**: Since the app is not signed with an Apple Developer certificate, you may need to right-click the app and select "Open" for the first time.
+
 ## Requirements
 
 - macOS (Recommended for Finder integration)
