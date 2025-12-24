@@ -72,6 +72,7 @@ class ImageFinderApp(QMainWindow):
 
         # Directory Group
         self.btn_add_dir = QPushButton("Add Folder") # Shorter text
+        self.btn_add_dir.setObjectName("PrimaryButton")
         self.btn_add_dir.clicked.connect(self.add_directory)
         self.btn_add_dir.setShortcut("Ctrl+O")
         self.btn_add_dir.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -94,6 +95,7 @@ class ImageFinderApp(QMainWindow):
 
         # Indexing Group
         self.btn_index = QPushButton("Index") # Shorter text
+        self.btn_index.setObjectName("PrimaryButton")
         self.btn_index.clicked.connect(self.start_indexing)
         self.btn_index.setCursor(Qt.CursorShape.PointingHandCursor)
         

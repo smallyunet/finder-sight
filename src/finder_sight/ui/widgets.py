@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QLabel, QWidget, QHBoxLayout, QVBoxLayout, QFrame, QSizePolicy
+from PyQt6.QtWidgets import QLabel, QWidget, QHBoxLayout, QVBoxLayout, QFrame, QSizePolicy, QStyle, QStyleOption
 from PyQt6.QtCore import pyqtSignal, Qt, QSize
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMouseEvent, QPixmap
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMouseEvent, QPixmap, QPainter
 import os
 
 class ClickableLabel(QLabel):
@@ -26,8 +26,15 @@ class DropLabel(QLabel):
         self._preview_pixmap = None
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setProperty("state", "idle")
+        self.setObjectName("DropZone") # Ensure object name is set for styling
 
-    def dragEnterEvent(self, event: QDragEnterEvent):
+    def paintEvent(self, event):
+        """Override to respect stylesheet backgrounds and borders for custom widgets."""
+        opt = QStyleOption()
+        opt.initFrom(self)
+        painter = QPainter(self)
+        self.style().drawPrimitive(QStyle.PrimitiveElement.PE_Widget, opt, painter, self)
+        super().paintEvent(event)
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
             self.setProperty("state", "dragging")

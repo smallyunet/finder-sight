@@ -57,44 +57,44 @@ QPushButton:disabled {
 }
 
 /* Primary Action Buttons */
-QPushButton#PrimaryButton, QPushButton[text="Start Indexing"], QPushButton[text="Add Directory"] {
+QPushButton#PrimaryButton, QPushButton[text="Index"], QPushButton[text="Add Folder"] {
     background-color: #007AFF;
     border: 1px solid #007AFF;
     color: white;
 }
-QPushButton#PrimaryButton:hover, QPushButton[text="Start Indexing"]:hover, QPushButton[text="Add Directory"]:hover {
+QPushButton#PrimaryButton:hover, QPushButton[text="Index"]:hover, QPushButton[text="Add Folder"]:hover {
     background-color: #0062cc;
     border-color: #0062cc;
 }
-QPushButton#PrimaryButton:pressed, QPushButton[text="Start Indexing"]:pressed, QPushButton[text="Add Directory"]:pressed {
+QPushButton#PrimaryButton:pressed, QPushButton[text="Index"]:pressed, QPushButton[text="Add Folder"]:pressed {
     background-color: #0051a8;
 }
 
 /* Danger Buttons */
-QPushButton#DangerButton {
+QPushButton#DangerButton, QPushButton[text="Stop"] {
     color: #ff3b30;
     border-color: #ff3b30;
 }
-QPushButton#DangerButton:hover {
+QPushButton#DangerButton:hover, QPushButton[text="Stop"]:hover {
     background-color: #fff0f0;
 }
-QPushButton#DangerButton:pressed {
+QPushButton#DangerButton:pressed, QPushButton[text="Stop"]:pressed {
     background-color: #ffe5e5;
 }
 
 /* Secondary/Ghost Buttons */
-QPushButton#SecondaryButton {
+QPushButton#SecondaryButton, QPushButton[text="Clear"] {
     background-color: transparent;
     border: none;
     color: #007AFF;
     padding: 2px 6px;
 }
-QPushButton#SecondaryButton:hover {
+QPushButton#SecondaryButton:hover, QPushButton[text="Clear"]:hover {
     text-decoration: underline;
 }
 
 /* Drop Zone */
-QLabel#DropZone {
+#DropZone {
     background-color: #ffffff;
     border: 2px dashed #c7c7cc;
     border-radius: 8px;
@@ -102,17 +102,17 @@ QLabel#DropZone {
     font-size: 13px;
     font-weight: 500;
 }
-QLabel#DropZone[state="dragging"] {
+#DropZone[state="dragging"] {
     background-color: #e3f2fd;
     border-color: #007AFF;
     color: #007AFF;
 }
-QLabel#DropZone[state="searching"] {
+#DropZone[state="searching"] {
     background-color: #fbfbfd;
     border: 2px solid #007AFF;
     color: #007AFF;
 }
-QLabel#DropZone[state="preview"] {
+#DropZone[state="preview"] {
     background-color: #ffffff;
     border: 1px solid #d1d1d6;
 }
