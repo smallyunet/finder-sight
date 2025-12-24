@@ -44,6 +44,6 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='Finder Sight.app',
-    icon=None,
-    bundle_identifier=None,
+    icon='icon.icns',
+    bundle_identifier='com.smallyunet.finder-sight',
 )
