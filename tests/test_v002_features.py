@@ -17,8 +17,15 @@ def test_index_loader_thread(qtbot):
     # Create a dummy index file
     with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp:
         index_data = {
-            "/path/to/img1.jpg": "0000000000000000",
-            "/path/to/img2.jpg": "ffffffffffffffff"
+            "version": "v3_mtime",
+            "data": {
+                "/path/to/img1.jpg": "0000000000000000",
+                "/path/to/img2.jpg": "ffffffffffffffff"
+            },
+            "mtimes": {
+                "/path/to/img1.jpg": 123456789,
+                "/path/to/img2.jpg": 123456790
+            }
         }
         json.dump(index_data, tmp)
         tmp_path = tmp.name
@@ -27,8 +34,8 @@ def test_index_loader_thread(qtbot):
         thread = IndexLoaderThread(tmp_path)
         
         results = []
-        def on_finished(idx, hashes):
-            results.append((idx, hashes))
+        def on_finished(idx, hashes, mtimes):
+            results.append((idx, hashes, mtimes))
             
         thread.finished.connect(on_finished)
         
@@ -36,9 +43,10 @@ def test_index_loader_thread(qtbot):
             thread.start()
             
         assert len(results) == 1
-        idx, hashes = results[0]
+        idx, hashes, mtimes = results[0]
         assert len(idx) == 2
         assert len(hashes) == 2
+        assert len(mtimes) == 2
         assert "/path/to/img1.jpg" in idx
         
     finally:
@@ -51,12 +59,12 @@ class MockSlowIndexerThread(IndexerThread):
         # Simulate long running task
         for i in range(50):
             if self.isInterruptionRequested():
-                self.finished.emit({})
+                self.finished.emit({}, {})
                 return
             time.sleep(0.05)
             self.progress_update.emit(i+1, 50, f"file_{i}.jpg")
         
-        self.finished.emit({})
+        self.finished.emit({}, {})
     
     def stop(self) -> None:
         self.is_running = False

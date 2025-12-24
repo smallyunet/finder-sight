@@ -216,6 +216,8 @@ class ImageFinderApp(QMainWindow):
             self.indexer_thread.stop()
             self.lbl_status.setText("Stopping indexer...")
             self.btn_cancel.setEnabled(False)
+            self.btn_index.setEnabled(True)
+            self.btn_clear_index.setEnabled(True)
 
     def on_deleted_files_found(self, deleted_paths: list[str]) -> None:
         """Handle notification of deleted files from indexer."""

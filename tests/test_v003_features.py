@@ -14,7 +14,7 @@ class MockIndexerThread(IndexerThread):
     def run(self) -> None:
         self.is_running = True
         # Just finish immediately with empty data for testing state
-        self.finished.emit({})
+        self.finished.emit({}, {})
 
 def test_clear_index(qtbot, monkeypatch):
     """Test clearing the index."""
@@ -51,7 +51,7 @@ def test_ui_state_after_cancel(qtbot, monkeypatch):
             self.is_running = True
             while not self.isInterruptionRequested():
                 self.msleep(10)
-            self.finished.emit({})
+            self.finished.emit({}, {})
         
         def stop(self):
             self.is_running = False
