@@ -115,21 +115,17 @@ class ResultWidget(QWidget):
         # Main layout - Vertical for Grid
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(4)
+        layout.setSpacing(6)
         
-        # Thumbnail container (Larger for Grid)
+        # Thumbnail container
         self.thumb_container = QLabel()
-        self.thumb_container.setFixedSize(100, 100)
+        self.thumb_container.setObjectName("ResultThumbnail")
+        self.thumb_container.setFixedSize(110, 110) # Slightly larger
         self.thumb_container.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.thumb_container.setStyleSheet("""
-            background-color: #f0f0f0; 
-            border-radius: 8px; 
-            border: 1px solid #e0e0e0;
-        """)
         
         if not pixmap.isNull():
             scaled_pixmap = pixmap.scaled(
-                QSize(96, 96), 
+                QSize(100, 100), 
                 Qt.AspectRatioMode.KeepAspectRatio, 
                 Qt.TransformationMode.SmoothTransformation
             )
@@ -139,25 +135,40 @@ class ResultWidget(QWidget):
         
         # Info container
         info_layout = QVBoxLayout()
-        info_layout.setSpacing(0)
-        info_layout.setContentsMargins(2, 0, 2, 0)
+        info_layout.setSpacing(2)
+        info_layout.setContentsMargins(0, 0, 0, 0)
         
         file_name = os.path.basename(path)
         self.lbl_name = QLabel(file_name)
+        self.lbl_name.setObjectName("ResultName")
         self.lbl_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_name.setFixedWidth(100) # Match container
-        self.lbl_name.setStyleSheet("font-size: 11px; font-weight: 500; color: #1d1d1f;")
-        # Simple truncation if too long (better would be elision but this is a quick fix)
-        if len(file_name) > 15:
-            self.lbl_name.setText(file_name[:12] + "...")
+        self.lbl_name.setFixedWidth(110)
         
-        self.lbl_dist = QLabel(f"Dist: {distance:.2f}")
+        # Simple truncation
+        if len(file_name) > 16:
+            self.lbl_name.setText(file_name[:13] + "...")
+        else:
+            self.lbl_name.setText(file_name)
+            
+        # Create match confidence (Similarity = 1.0 - distance roughly, or similar)
+        # Assuming distance is Hamming distance (0-64 approx for 8x8 hash? No, user code compares hashes.
+        # User requested similarity tags like "98% Match".
+        # We need to know how 'distance' relates to similarity.
+        # imagehash distance of 0 is exact match.
+        # For pHash/dHash, range is usually small for similar images (< 5-10).
+        # Let's approximate: Similarity = 1 - (dist / 64) ? Usually hash size is 64 bits.
+        # But let's just show what we have, or try to convert.
+        # For now, let's keep it simple or guess: (1 - dist/64) * 100%
+        # NOTE: logic might depend on hash size (64).
+        similarity = max(0, 1.0 - (distance / 64.0)) * 100
+        self.lbl_dist = QLabel(f"{int(similarity)}% Match")
+        self.lbl_dist.setObjectName("ResultScore")
         self.lbl_dist.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_dist.setStyleSheet("font-size: 10px; color: #007AFF;")
         
         info_layout.addWidget(self.lbl_name)
         info_layout.addWidget(self.lbl_dist)
         
         layout.addLayout(info_layout)
-        # self.setToolTip(path) # Set tooltip to full path
+        self.setToolTip(path)
+
 
