@@ -165,11 +165,16 @@ class ImageFinderApp(QMainWindow):
         result_layout.addWidget(lbl_results)
 
         self.result_list = QListWidget()
-        self.result_list.setIconSize(QSize(40, 40)) # Match new widget thumbnail
+        self.result_list.setViewMode(QListWidget.ViewMode.IconMode)
+        self.result_list.setResizeMode(QListWidget.ResizeMode.Adjust)
+        self.result_list.setSpacing(10)
+        self.result_list.setMovement(QListWidget.Movement.Static)
+        self.result_list.setIconSize(QSize(40, 40)) 
         self.result_list.itemDoubleClicked.connect(self.on_result_double_clicked)
         self.result_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.result_list.customContextMenuRequested.connect(self.show_context_menu)
         self.result_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        self.result_list.setStyleSheet("QListWidget { padding: 10px; }")
         
         result_layout.addWidget(self.result_list)
         layout.addWidget(result_group)

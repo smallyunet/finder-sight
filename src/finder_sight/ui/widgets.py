@@ -112,66 +112,52 @@ class DropLabel(QLabel):
 class ResultWidget(QWidget):
     def __init__(self, path: str, distance: float, pixmap: QPixmap):
         super().__init__()
-        # Main layout - Compact
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(6, 4, 6, 4)
-        layout.setSpacing(10)
+        # Main layout - Vertical for Grid
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(4)
         
-        # Thumbnail container (Smaller)
-        thumb_container = QLabel()
-        thumb_container.setFixedSize(42, 42)
-        thumb_container.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        thumb_container.setStyleSheet("""
+        # Thumbnail container (Larger for Grid)
+        self.thumb_container = QLabel()
+        self.thumb_container.setFixedSize(100, 100)
+        self.thumb_container.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.thumb_container.setStyleSheet("""
             background-color: #f0f0f0; 
-            border-radius: 4px; 
+            border-radius: 8px; 
             border: 1px solid #e0e0e0;
         """)
         
         if not pixmap.isNull():
             scaled_pixmap = pixmap.scaled(
-                QSize(40, 40), 
+                QSize(96, 96), 
                 Qt.AspectRatioMode.KeepAspectRatio, 
                 Qt.TransformationMode.SmoothTransformation
             )
-            thumb_container.setPixmap(scaled_pixmap)
+            self.thumb_container.setPixmap(scaled_pixmap)
         
-        layout.addWidget(thumb_container)
+        layout.addWidget(self.thumb_container, 0, Qt.AlignmentFlag.AlignCenter)
         
         # Info container
         info_layout = QVBoxLayout()
-        info_layout.setSpacing(0) # Minimal vertical spacing
-        info_layout.setContentsMargins(0, 2, 0, 2)
-        
-        # Top Row: Name + Score
-        top_row = QHBoxLayout()
-        top_row.setSpacing(8)
+        info_layout.setSpacing(0)
+        info_layout.setContentsMargins(2, 0, 2, 0)
         
         file_name = os.path.basename(path)
         self.lbl_name = QLabel(file_name)
-        self.lbl_name.setStyleSheet("font-size: 13px; font-weight: 600; color: #1d1d1f;")
+        self.lbl_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_name.setFixedWidth(100) # Match container
+        self.lbl_name.setStyleSheet("font-size: 11px; font-weight: 500; color: #1d1d1f;")
+        # Simple truncation if too long (better would be elision but this is a quick fix)
+        if len(file_name) > 15:
+            self.lbl_name.setText(file_name[:12] + "...")
         
-        similarity_text = f"Dist: {distance:.2f}"
-        self.lbl_dist = QLabel(similarity_text)
-        self.lbl_dist.setStyleSheet("""
-            font-size: 11px; 
-            font-weight: 500; 
-            color: #007AFF; 
-            padding: 0px 4px;
-        """)
-        self.lbl_dist.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.lbl_dist = QLabel(f"Dist: {distance:.2f}")
+        self.lbl_dist.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_dist.setStyleSheet("font-size: 10px; color: #007AFF;")
         
-        top_row.addWidget(self.lbl_name)
-        top_row.addWidget(self.lbl_dist)
-        top_row.addStretch()
-        
-        # Bottom Row: Path
-        self.lbl_path = QLabel(path)
-        self.lbl_path.setStyleSheet("font-size: 11px; color: #86868b;")
-        self.lbl_path.setWordWrap(False)
-        self.lbl_path.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
-        
-        info_layout.addLayout(top_row)
-        info_layout.addWidget(self.lbl_path)
+        info_layout.addWidget(self.lbl_name)
+        info_layout.addWidget(self.lbl_dist)
         
         layout.addLayout(info_layout)
+        # self.setToolTip(path) # Set tooltip to full path
 

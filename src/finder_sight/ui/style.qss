@@ -20,9 +20,9 @@ QListWidget {
     padding: 2px; /* Tighter padding */
 }
 QListWidget::item {
-    border-radius: 4px;
-    padding: 2px; /* Very tight item padding */
-    margin-bottom: 0px;
+    border-radius: 8px;
+    padding: 8px;
+    margin: 4px;
 }
 QListWidget::item:selected {
     background-color: #007AFF;
@@ -30,6 +30,7 @@ QListWidget::item:selected {
 }
 QListWidget::item:hover:!selected {
     background-color: #f2f2f7;
+    border: 1px solid #d1d1d6;
 }
 
 /* Base Buttons */
