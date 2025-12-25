@@ -74,6 +74,8 @@ class ImageFinderApp(QMainWindow):
         # Connect Sidebar signals
         self.sidebar.add_folder_clicked.connect(self.add_directory)
         self.sidebar.remove_folder_clicked.connect(self.remove_directory)
+        self.sidebar.refresh_clicked.connect(self.start_indexing)
+        self.sidebar.info_clicked.connect(self.show_index_manager)
         
         # 2. Search Area (Right)
         self.search_area = SearchArea()
@@ -88,6 +90,32 @@ class ImageFinderApp(QMainWindow):
         self.splitter.setSizes([250, 750])
         self.splitter.setCollapsible(0, False) # Can't fully hide sidebar
         
+    def show_index_manager(self):
+        import os
+        import time
+        from src.finder_sight.ui.index_manager_dialog import IndexManagerDialog
+        from src.finder_sight.constants import INDEX_FILE
+        
+        count = len(self.image_index)
+        last_mod = None
+        if os.path.exists(INDEX_FILE):
+             t = os.path.getmtime(INDEX_FILE)
+             last_mod = time.ctime(t)
+             
+        dialog = IndexManagerDialog(self, os.path.abspath(INDEX_FILE), count, last_mod)
+        dialog.clear_requested.connect(self.clear_index_confirmed)
+        dialog.exec()
+        
+    def clear_index_confirmed(self):
+        # We already asked for confirmation in the dialog
+        self.image_index = {}
+        self.image_hashes = {}
+        self.image_mtimes = {}
+        self.save_index()
+        self.search_area.clear()
+        self.sidebar.set_status("Index cleared")
+        QMessageBox.information(self, "Success", "Index cleared successfully.")
+
     def add_directory(self):
         dir_path = QFileDialog.getExistingDirectory(self, "Select Directory")
         if dir_path:

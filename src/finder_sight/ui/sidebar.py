@@ -28,6 +28,8 @@ class FolderItemWidget(QWidget):
 class Sidebar(QWidget):
     add_folder_clicked = pyqtSignal()
     remove_folder_clicked = pyqtSignal()
+    refresh_clicked = pyqtSignal()
+    info_clicked = pyqtSignal()
     
     def __init__(self):
         super().__init__()
@@ -77,8 +79,22 @@ class Sidebar(QWidget):
         self.lbl_status = QLabel("")
         self.lbl_status.setStyleSheet("font-size: 11px; color: #86868b;")
         
+        self.btn_refresh = QPushButton("↻")
+        self.btn_refresh.setToolTip("Index Now")
+        self.btn_refresh.setFixedSize(24, 24)
+        self.btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_refresh.clicked.connect(self.refresh_clicked)
+        
+        self.btn_info = QPushButton("ℹ")
+        self.btn_info.setToolTip("Index Information")
+        self.btn_info.setFixedSize(24, 24)
+        self.btn_info.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_info.clicked.connect(self.info_clicked)
+        
         actions_layout.addWidget(self.btn_add)
         actions_layout.addWidget(self.btn_remove)
+        actions_layout.addWidget(self.btn_refresh)
+        actions_layout.addWidget(self.btn_info)
         actions_layout.addStretch()
         actions_layout.addWidget(self.lbl_status)
         
