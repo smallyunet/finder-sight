@@ -93,11 +93,22 @@ class SearchArea(QWidget):
             # (Note: In a real heavy app this should be async/lazy, but for now we do it here)
             pixmap = QPixmap()
             reader = QImageReader(path)
-            # Request slightly larger than displayed for crispness
-            reader.setScaledSize(QSize(150, 150)) 
-            img = reader.read()
-            if not img.isNull():
-                pixmap = QPixmap.fromImage(img)
+            if reader.canRead():
+                size = reader.size()
+                if size.isValid():
+                    # Calculate new size enabling aspect ratio preservation
+                    # Target bounding box is 150x150
+                    max_dim = 150
+                    ratio = min(max_dim / size.width(), max_dim / size.height())
+                    new_width = int(size.width() * ratio)
+                    new_height = int(size.height() * ratio)
+                    reader.setScaledSize(QSize(new_width, new_height))
+                else:
+                    reader.setScaledSize(QSize(150, 150))
+                
+                img = reader.read()
+                if not img.isNull():
+                    pixmap = QPixmap.fromImage(img)
             
             # Create Widget
             widget = ResultWidget(path, dist, pixmap)
