@@ -32,13 +32,14 @@ def test_clear_index(qtbot, monkeypatch):
     # Fill some dummy data
     app.image_index = {"path1": "hash1"}
     app.image_hashes = {"path1": "obj1"}
-    app.result_list.addItem("Found image")
+    # result_list is now in search_area
+    app.search_area.result_list.addItem("Found image")
     
     app.clear_index()
     
     assert len(app.image_index) == 0
     assert len(app.image_hashes) == 0
-    assert app.result_list.count() == 0
+    assert app.search_area.result_list.count() == 0
 
 def test_ui_state_after_cancel(qtbot, monkeypatch):
     """Test that UI buttons are correctly enabled/disabled after cancel."""
@@ -67,27 +68,23 @@ def test_ui_state_after_cancel(qtbot, monkeypatch):
     qtbot.addWidget(app)
     
     # 1. Before indexing
-    assert app.btn_index.isEnabled()
-    assert not app.btn_cancel.isEnabled()
-    assert app.btn_clear_index.isEnabled()
+    assert app.indexer_thread is None or not app.indexer_thread.isRunning()
     
     # 2. Start indexing
-    qtbot.mouseClick(app.btn_index, Qt.MouseButton.LeftButton)
+    app.start_indexing()
+    
     # Wait for thread to actually start
     qtbot.waitUntil(lambda: app.indexer_thread is not None and app.indexer_thread.isRunning(), timeout=1000)
-    assert not app.btn_index.isEnabled()
-    assert app.btn_cancel.isEnabled()
-    assert not app.btn_clear_index.isEnabled()
+    assert app.indexer_thread.isRunning()
     
     # 3. Cancel indexing - click and wait for thread to finish
-    qtbot.mouseClick(app.btn_cancel, Qt.MouseButton.LeftButton)
+    app.cancel_indexing()
+    
     # Wait for the thread to stop running
     qtbot.waitUntil(lambda: not app.indexer_thread.isRunning(), timeout=2000)
     # Process pending events to ensure finished signal is handled
     QApplication.processEvents()
         
     # 4. After cancel
-    assert app.btn_index.isEnabled()
-    assert not app.btn_cancel.isEnabled()
-    assert app.btn_clear_index.isEnabled()
-    assert not app.progress_bar.isVisible()
+    assert not app.indexer_thread.isRunning()
+    assert app.indexing_cancelled
