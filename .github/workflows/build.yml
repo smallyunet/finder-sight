@@ -29,6 +29,9 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
 
+    - name: Sync version from git tag
+      run: python tools/sync_version.py
+
     - name: Build with PyInstaller
       run: |
         pyinstaller finder_sight.spec
