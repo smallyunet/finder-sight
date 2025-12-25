@@ -54,6 +54,32 @@ class SettingsDialog(QDialog):
         search_group.setLayout(search_layout)
         layout.addWidget(search_group)
         
+        # About Group
+        about_group = QGroupBox("About")
+        about_layout = QVBoxLayout()
+        
+        # Version Info
+        from src.finder_sight import __version__ as APP_VERSION
+        version_layout = QHBoxLayout()
+        version_layout.addWidget(QLabel(f"Current Version: <b>{APP_VERSION}</b>"))
+        version_layout.addStretch()
+        about_layout.addLayout(version_layout)
+        
+        # Update Check
+        update_layout = QHBoxLayout()
+        self.btn_check_update = QPushButton("Check for Updates")
+        self.btn_check_update.clicked.connect(self.check_updates)
+        self.lbl_update_status = QLabel("")
+        self.lbl_update_status.setStyleSheet("color: #86868b; font-size: 11px;")
+        
+        update_layout.addWidget(self.btn_check_update)
+        update_layout.addWidget(self.lbl_update_status)
+        update_layout.addStretch()
+        
+        about_layout.addLayout(update_layout)
+        about_group.setLayout(about_layout)
+        layout.addWidget(about_group)
+        
         # Buttons
         button_layout = QHBoxLayout()
         button_layout.addStretch()
@@ -68,7 +94,35 @@ class SettingsDialog(QDialog):
         button_layout.addWidget(self.btn_ok)
         
         layout.addLayout(button_layout)
-    
+        
+    def check_updates(self):
+        self.btn_check_update.setEnabled(False)
+        self.lbl_update_status.setText("Checking...")
+        
+        from src.finder_sight.utils.updater_thread import UpdateCheckThread
+        self.update_thread = UpdateCheckThread()
+        self.update_thread.finished.connect(self.on_update_checked)
+        self.update_thread.start()
+        
+    def on_update_checked(self, available, latest, url):
+        self.btn_check_update.setEnabled(True)
+        if available:
+            self.lbl_update_status.setText(f"New version {latest} available!")
+            self.lbl_update_status.setStyleSheet("color: #007AFF; font-weight: bold;")
+            # Maybe change button text or add a link
+            from PyQt6.QtGui import QDesktopServices
+            from PyQt6.QtCore import QUrl
+            # We can't easily change the button action dynamically without disconnection
+            # For simplicity, open URL if user clicks 'Check' again? No that's confusing.
+            # Let's just open the URL immediately? Or show a dialog?
+            # User asked for info on interface, not necessarily popup.
+            # But let's keep it simple: Text link.
+            self.lbl_update_status.setText(f"<a href='{url}'>New version {latest} available!</a>")
+            self.lbl_update_status.setOpenExternalLinks(True)
+        else:
+            self.lbl_update_status.setText("You are up to date.")
+            self.lbl_update_status.setStyleSheet("color: #34C759;")
+
     def get_settings(self) -> dict:
         """Return the current settings from the dialog."""
         return {

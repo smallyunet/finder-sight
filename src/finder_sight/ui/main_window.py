@@ -23,17 +23,8 @@ from src.finder_sight.ui.search_area import SearchArea
 from src.finder_sight.ui.settings_dialog import SettingsDialog
 from src.finder_sight.utils.logger import logger
 from src.finder_sight.utils.resource_helper import get_resource_path
+from src.finder_sight.utils.updater_thread import UpdateCheckThread
 from src.finder_sight import __version__ as APP_VERSION
-
-class UpdateCheckThread(QThread):
-    finished = pyqtSignal(bool, str, str) # update_available, latest_version, url
-
-    def run(self):
-        # Hardcoded repo for now, can be moved to config or constants
-        owner = "smallyunet"
-        repo = "finder-sight"
-        available, latest, url = check_for_updates(APP_VERSION, owner, repo)
-        self.finished.emit(available, latest, url)
 
 class ImageFinderApp(QMainWindow):
     def __init__(self):
