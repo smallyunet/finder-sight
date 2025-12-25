@@ -371,7 +371,7 @@ class ImageFinderApp(QMainWindow):
         self.update_thread.finished.connect(self.on_update_check_finished)
         self.update_thread.start()
 
-    def on_update_check_finished(self, available, latest, url):
+    def on_update_check_finished(self, available, latest, url, error):
         self.sidebar.set_status("Ready")
         if available:
             reply = QMessageBox.question(
@@ -383,5 +383,7 @@ class ImageFinderApp(QMainWindow):
             
             if reply == QMessageBox.StandardButton.Yes:
                 QDesktopServices.openUrl(QUrl(url))
+        elif error:
+             QMessageBox.warning(self, "Update Check Failed", f"Failed to check for updates:\n{error}")
         else:
              QMessageBox.information(self, "Up to Date", f"You are using the latest version ({APP_VERSION}).")
