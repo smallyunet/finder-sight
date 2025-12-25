@@ -6,7 +6,8 @@ import io
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QSplitter, QFileDialog, QMessageBox, QMenu)
 from PyQt6.QtCore import Qt, QBuffer, QIODevice, QSize
-from PyQt6.QtGui import QAction, QKeySequence, QPixmap
+from PyQt6.QtGui import QAction, QKeySequence, QPixmap, QDesktopServices
+from PyQt6.QtCore import QUrl, QThread, pyqtSignal
 
 from PIL import Image
 import imagehash
@@ -21,6 +22,18 @@ from src.finder_sight.ui.sidebar import Sidebar
 from src.finder_sight.ui.search_area import SearchArea
 from src.finder_sight.ui.settings_dialog import SettingsDialog
 from src.finder_sight.utils.logger import logger
+from src.finder_sight.utils.updater import check_for_updates
+from src.finder_sight import __version__ as APP_VERSION
+
+class UpdateCheckThread(QThread):
+    finished = pyqtSignal(bool, str, str) # update_available, latest_version, url
+
+    def run(self):
+        # Hardcoded repo for now, can be moved to config or constants
+        owner = "smallyunet"
+        repo = "finder-sight"
+        available, latest, url = check_for_updates(APP_VERSION, owner, repo)
+        self.finished.emit(available, latest, url)
 
 class ImageFinderApp(QMainWindow):
     def __init__(self):
@@ -313,7 +326,13 @@ class ImageFinderApp(QMainWindow):
         settings_action = QAction("&Settings...", self)
         settings_action.setShortcut("Ctrl+,")
         settings_action.triggered.connect(self.show_settings)
+        settings_action.triggered.connect(self.show_settings)
         edit_menu.addAction(settings_action)
+
+        help_menu = menu_bar.addMenu("&Help")
+        update_action = QAction("Check for Updates...", self)
+        update_action.triggered.connect(self.check_updates)
+        help_menu.addAction(update_action)
 
     def show_settings(self):
         current_settings = {
@@ -326,3 +345,24 @@ class ImageFinderApp(QMainWindow):
             self.similarity_threshold = settings['similarity_threshold']
             self.max_results = settings['max_results']
             self.save_config()
+
+    def check_updates(self):
+        self.sidebar.set_status("Checking for updates...")
+        self.update_thread = UpdateCheckThread()
+        self.update_thread.finished.connect(self.on_update_check_finished)
+        self.update_thread.start()
+
+    def on_update_check_finished(self, available, latest, url):
+        self.sidebar.set_status("Ready")
+        if available:
+            reply = QMessageBox.question(
+                self, 
+                "Update Available", 
+                f"A new version ({latest}) is available.\n\nCurrent version: {APP_VERSION}\n\nDo you want to download it now?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                QDesktopServices.openUrl(QUrl(url))
+        else:
+             QMessageBox.information(self, "Up to Date", f"You are using the latest version ({APP_VERSION}).")
