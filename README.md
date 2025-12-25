@@ -6,6 +6,8 @@ A macOS desktop application for "Reverse Image Search" that helps you find local
 ![Python](https://img.shields.io/badge/python-3.9+-blue.svg)
 ![Build Status](https://github.com/smallyunet/finder-sight/actions/workflows/ci.yml/badge.svg)
 
+![Finder Sight Demo](docs/assets/screenshot_main.png)
+
 ## Features
 
 - **Smart Indexing**: Select directories to scan for images and build a local index.
@@ -13,6 +15,8 @@ A macOS desktop application for "Reverse Image Search" that helps you find local
 - **Perceptual Matching**: Uses Perceptual Hashing (dhash) to find similar images even if they are resized, compressed, or slightly modified.
 - **Finder Integration**: Reveal the found image directly in macOS Finder with a single click.
 - **Privacy Focused**: All processing happens locally on your machine. No images are uploaded to the cloud.
+
+📚 **[Read the Full User Guide](docs/guide.md)** for detailed instructions.
 
 ## Download
 
