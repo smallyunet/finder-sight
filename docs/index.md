@@ -50,11 +50,11 @@ python run.py
 
 ## 📸 Demo
 
-> *(Place a GIF here demonstrating the drag-and-drop search process)*
+![Demo Screenshot](assets/screenshot_main.png)
 
-1. **Build Index**: Add your image folders and click "Start Indexing".
-2. **Search**: Take a screenshot or copy an image, then paste it into the app.
-3. **Get Result**: Instant response with the file path.
+1. **Build Index**: Add folders via the Sidebar ("+") to auto-index your library.
+2. **Search**: Drag & drop an image or paste (`Cmd+V`) a screenshot.
+3. **Get Result**: Double-click any match to reveal it in Finder.
 
 ---
 

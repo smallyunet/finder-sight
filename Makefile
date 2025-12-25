@@ -1,4 +1,4 @@
-.PHONY: install build clean
+.PHONY: install build clean screenshot
 
 install:
 	pip install -r requirements.txt
@@ -9,3 +9,6 @@ build:
 clean:
 	rm -rf build dist
 	rm -rf __pycache__
+
+screenshot:
+	pytest tools/capture_screenshots.py

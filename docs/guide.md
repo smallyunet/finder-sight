@@ -54,17 +54,18 @@ Finder Sight is a Python desktop application. You need to ensure that a Python e
 Before searching, you need to tell Finder Sight where to look for images.
 
 ### Add Directory
-1. Click the **"Add Directory"** button in the top-left corner.
+1. Click the **"+" button** in the bottom-left corner of the sidebar, or use **File > Add Directory** (`Cmd+O`).
 2. Select a folder containing images (e.g., `~/Pictures` or your design assets folder).
-3. You can add multiple different folders.
+3. The folder will appear in the **Library** sidebar.
 
-### Start Indexing
-1. Click the **"Start Indexing"** button.
-2. The progress bar will show the current status.
-   - *Note: The first indexing might take some time depending on the number of images. The process calculates a "fingerprint" (Hash) for each image.*
-3. Once completed, a popup will say "Indexing complete".
+### Indexing
+- **Automatic**: When you add a new directory, Finder Sight automatically starts indexing it.
+- **Manual**: If you add new files to an existing folder, you can update the index by selecting **File > Index Now** (`Cmd+I`).
 
-> **Tip**: Index data is saved locally in `image_index.json`. You don't need to re-index on the next launch unless you've added new images.
+### Status
+The sidebar status indicator will show "Indexing: [filename]" during the process. Once finished, it will show "Ready".
+
+> **Tip**: Index data is saved locally. You don't need to re-index on every launch.
 
 ---
 
@@ -74,7 +75,7 @@ Finder Sight provides two extremely convenient ways to search.
 
 ### Method 1: Drag & Drop
 If you have an image file (e.g., on your desktop or in a web browser):
-1. **Drag** the image file directly into the Finder Sight main window.
+1. **Drag** the image file directly into the **Search Area** (the large empty space on the right).
 2. Release the mouse, and the search starts immediately.
 
 ### Method 2: Clipboard Search (Copy & Paste)
@@ -85,10 +86,12 @@ This is the most efficient way, especially for web images or screenshots:
 4. The app will automatically read the image data from the clipboard and start searching.
 
 ### View Results
-- **Match Found**:
-  - The thumbnail of the original image found will be displayed.
-  - A match score is shown. Lower score means less difference (0 means identical).
-  - Click the **"Reveal in Finder"** button to automatically open Finder and highlight the file.
+- **Matches List**:
+  - Found images are displayed in the main result area on the right.
+  - Each result shows a thumbnail and a similarity score (lower is better, 0 is identical).
+  
+- **Reveal in Finder**:
+  - **Double-click** on any result item to instantly reveal the file in Finder.
   
 - **Not Found**:
   - The interface shows "No matching image found".

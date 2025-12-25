@@ -59,16 +59,17 @@ You can download the latest pre-built version of Finder Sight for macOS from the
    ```
 
 2. **Build Index**
-   - Click "Add Directory" to select folders containing your images (e.g., your Photos library export or specific work folders).
-   - Click "Start Indexing" to scan and build the hash database.
+   - Click the "+" button in the Sidebar to add image folders.
+   - Indexing starts automatically.
+   - Use `File > Index Now` to manually update the index later.
 
 3. **Search**
-   - Drag an image file into the drop zone.
-   - Or copy an image to your clipboard and press `Cmd+V` in the app.
+   - Drag an image file into the search area.
+   - Or copy an image to your clipboard and press `Cmd+V`.
 
 4. **Locate**
-   - If a match is found, a preview and path will be displayed.
-   - Click "Reveal in Finder" to open the folder containing the image.
+   - Matching images appear in the results list with similarity scores.
+   - **Double-click** a result to reveal it in Finder.
 
 ## Development
 
