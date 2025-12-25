@@ -5,7 +5,7 @@ a = Analysis(
     ['run.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('src/finder_sight/ui/style.qss', 'src/finder_sight/ui')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

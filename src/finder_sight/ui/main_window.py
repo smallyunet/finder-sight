@@ -22,7 +22,7 @@ from src.finder_sight.ui.sidebar import Sidebar
 from src.finder_sight.ui.search_area import SearchArea
 from src.finder_sight.ui.settings_dialog import SettingsDialog
 from src.finder_sight.utils.logger import logger
-from src.finder_sight.utils.updater import check_for_updates
+from src.finder_sight.utils.resource_helper import get_resource_path
 from src.finder_sight import __version__ as APP_VERSION
 
 class UpdateCheckThread(QThread):
@@ -63,13 +63,13 @@ class ImageFinderApp(QMainWindow):
 
     def load_stylesheet(self):
         try:
-            style_path = os.path.join(os.path.dirname(__file__), "style.qss")
-            # We might want to clear old specific widget styles if they conflict, 
-            # but QSS is usually additive or specific.
+            # Use helper to find style.qss in both dev and frozen mode
+            # We spec'd it to be at src/finder_sight/ui/style.qss in the bundle
+            style_path = get_resource_path("src/finder_sight/ui/style.qss")
             with open(style_path, "r") as f:
                 self.setStyleSheet(f.read())
         except Exception as e:
-            logger.warning(f"Failed to load stylesheet: {e}")
+            logger.warning(f"Failed to load stylesheet from {style_path}: {e}")
 
     def init_ui(self):
         # Master-Detail Layout using QSplitter
