@@ -58,9 +58,24 @@ class Sidebar(QWidget):
         self.folder_list.setFocusPolicy(Qt.FocusPolicy.NoFocus) # Remove focus outline
         layout.addWidget(self.folder_list)
         
-        # Bottom Actions
+        # Footer (Status + Actions)
+        footer = QWidget()
+        footer_layout = QVBoxLayout(footer)
+        footer_layout.setContentsMargins(0, 8, 0, 8)
+        footer_layout.setSpacing(4)
+        
+        # 1. Status Row
+        status_row = QWidget()
+        status_layout = QHBoxLayout(status_row)
+        status_layout.setContentsMargins(16, 0, 16, 0)
+        self.lbl_status = QLabel("")
+        self.lbl_status.setStyleSheet("font-size: 11px; color: #86868b;")
+        status_layout.addWidget(self.lbl_status)
+        footer_layout.addWidget(status_row)
+        
+        # 2. Actions Row
         actions_bar = QWidget()
-        actions_bar.setFixedHeight(48)
+        actions_bar.setFixedHeight(32)
         actions_layout = QHBoxLayout(actions_bar)
         actions_layout.setContentsMargins(12, 0, 12, 0)
         actions_layout.setSpacing(12)
@@ -69,15 +84,11 @@ class Sidebar(QWidget):
         self.btn_add.setFixedSize(24, 24)
         self.btn_add.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_add.clicked.connect(self.add_folder_clicked)
-        # Style allows it to look like a small icon button
         
         self.btn_remove = QPushButton("-")
         self.btn_remove.setFixedSize(24, 24)
         self.btn_remove.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_remove.clicked.connect(self.remove_folder_clicked)
-        
-        self.lbl_status = QLabel("")
-        self.lbl_status.setStyleSheet("font-size: 11px; color: #86868b;")
         
         self.btn_refresh = QPushButton("↻")
         self.btn_refresh.setToolTip("Index Now")
@@ -96,9 +107,9 @@ class Sidebar(QWidget):
         actions_layout.addWidget(self.btn_refresh)
         actions_layout.addWidget(self.btn_info)
         actions_layout.addStretch()
-        actions_layout.addWidget(self.lbl_status)
         
-        layout.addWidget(actions_bar)
+        footer_layout.addWidget(actions_bar)
+        layout.addWidget(footer)
         
     def add_folder(self, path):
         item = QListWidgetItem(self.folder_list)
@@ -120,10 +131,11 @@ class Sidebar(QWidget):
             
     def set_status(self, text, is_indexing=False):
         self.lbl_status.setText(text)
+        self.lbl_status.setToolTip(text) # Show full text on hover
         if is_indexing:
-             self.lbl_status.setStyleSheet("color: #007AFF;")
+             self.lbl_status.setStyleSheet("font-size: 11px; color: #007AFF;")
         else:
-             self.lbl_status.setStyleSheet("color: #86868b;")
+             self.lbl_status.setStyleSheet("font-size: 11px; color: #86868b;")
 
     def clear(self):
         self.folder_list.clear()
