@@ -23,7 +23,7 @@ class TestUpdater(unittest.TestCase):
         
         mock_urlopen.return_value = mock_response
         
-        available, latest, url = check_for_updates("0.9.0", "owner", "repo")
+        available, latest, url, error = check_for_updates("0.9.0", "owner", "repo")
         self.assertTrue(available)
         self.assertEqual(latest, "v1.0.0")
         self.assertEqual(url, "http://example.com")
@@ -38,7 +38,7 @@ class TestUpdater(unittest.TestCase):
         
         mock_urlopen.return_value = mock_response
         
-        available, latest, url = check_for_updates("0.9.0", "owner", "repo")
+        available, latest, url, error = check_for_updates("0.9.0", "owner", "repo")
         self.assertFalse(available)
 
 if __name__ == '__main__':

@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0", "setuptools-scm>=8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "finder-sight"
+dynamic = ["version"]
+description = "A macOS desktop application for Reverse Image Search"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+    { name = "smallyu", email = "smallyu@example.com" }
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS :: MacOS X",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "PyQt6>=6.10.0,<7.0.0",
+    "Pillow>=12.0.0,<13.0.0",
+    "ImageHash>=4.3.0,<5.0.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=9.0.0,<10.0.0",
+    "pytest-qt>=4.5.0,<5.0.0",
+]
+build = [
+    "pyinstaller>=6.17.0,<7.0.0",
+]
+
+[tool.setuptools]
+packages = ["finder_sight"]
+package-dir = {"" = "src"}
+
+[tool.setuptools_scm]
+write_to = "src/finder_sight/_version.py"

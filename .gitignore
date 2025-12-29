@@ -80,4 +80,4 @@ cover/
 # Project specific
 image_index.json
 config.json
-start.sh
+start.shsrc/finder_sight/_version.py
