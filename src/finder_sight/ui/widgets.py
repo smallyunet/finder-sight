@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QLabel, QWidget, QHBoxLayout, QVBoxLayout, QFrame, QSizePolicy, QStyle, QStyleOption
+from PyQt6.QtWidgets import QLabel, QWidget, QHBoxLayout, QVBoxLayout, QFrame, QSizePolicy, QStyle, QStyleOption, QPushButton
 from PyQt6.QtCore import pyqtSignal, Qt, QSize
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMouseEvent, QPixmap, QPainter
 import os
@@ -18,6 +18,7 @@ class ClickableLabel(QLabel):
 
 class DropLabel(QLabel):
     dropped = pyqtSignal(str)
+    cleared = pyqtSignal()
 
     def __init__(self, title):
         super().__init__(title)
@@ -27,6 +28,35 @@ class DropLabel(QLabel):
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setProperty("state", "idle")
         self.setObjectName("DropZone") # Ensure object name is set for styling
+        
+        # Close Button
+        self.btn_close = QPushButton("✕", self)
+        self.btn_close.setFixedSize(24, 24)
+        self.btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_close.hide()
+        self.btn_close.clicked.connect(self.on_close_clicked)
+        self.btn_close.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(0, 0, 0, 0.5);
+                color: white;
+                border-radius: 12px;
+                border: none;
+                font-weight: bold;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: rgba(0, 0, 0, 0.7);
+            }
+        """)
+
+    def on_close_clicked(self):
+        self.clear_preview()
+        self.cleared.emit()
+
+    def resizeEvent(self, event):
+        # Position top-right
+        self.btn_close.move(self.width() - 32, 8)
+        super().resizeEvent(event)
 
     def paintEvent(self, event):
         """Override to respect stylesheet backgrounds and borders for custom widgets."""
@@ -81,6 +111,7 @@ class DropLabel(QLabel):
             self._preview_pixmap = scaled
             self.setPixmap(scaled)
             self.setProperty("state", "preview")
+            self.btn_close.show() # Show button
             self.style().unpolish(self)
             self.style().polish(self)
 
@@ -89,13 +120,16 @@ class DropLabel(QLabel):
             self.clear() # Clear current display (text or pixmap)
             self.setText("🔍 Searching...")
             self.setProperty("state", "searching")
+            self.btn_close.show() # keep showing to allow cancel/clear
         else:
             if self._preview_pixmap:
                 self.setPixmap(self._preview_pixmap)
                 self.setProperty("state", "preview")
+                self.btn_close.show()
             else:
                 self.setText(self.default_title)
                 self.setProperty("state", "idle")
+                self.btn_close.hide()
         
         self.style().unpolish(self)
         self.style().polish(self)
@@ -105,6 +139,7 @@ class DropLabel(QLabel):
         self._preview_pixmap = None
         self.setText(self.default_title)
         self.setProperty("state", "idle")
+        self.btn_close.hide()
         self.style().unpolish(self)
         self.style().polish(self)
 

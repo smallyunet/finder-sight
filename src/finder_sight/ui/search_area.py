@@ -31,6 +31,7 @@ class SearchArea(QWidget):
         self.drop_zone.setFixedHeight(200)
         self.drop_zone.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.drop_zone.dropped.connect(self.image_dropped.emit)
+        self.drop_zone.cleared.connect(self.clear)
         
         layout.addWidget(self.drop_zone)
         

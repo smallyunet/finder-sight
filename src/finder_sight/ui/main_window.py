@@ -75,6 +75,7 @@ class ImageFinderApp(QMainWindow):
         self.sidebar.add_folder_clicked.connect(self.add_directory)
         self.sidebar.remove_folder_clicked.connect(self.remove_directory)
         self.sidebar.refresh_clicked.connect(self.start_indexing)
+        self.sidebar.clear_clicked.connect(self.clear_index)
         self.sidebar.info_clicked.connect(self.show_index_manager)
         
         # 2. Search Area (Right)
@@ -161,12 +162,8 @@ class ImageFinderApp(QMainWindow):
             self.sidebar.set_status("Stopping...")
             
     def update_indexing_progress(self, current, total, current_file):
-        # Update sidebar status with file name or percentage?
-        # Sidebar space is small, maybe just "Indexing: filename"
         filename = os.path.basename(current_file)
-        if len(filename) > 20:
-             filename = filename[:17] + "..."
-        self.sidebar.set_status(f"Indexing: {filename}", is_indexing=True)
+        self.sidebar.update_progress(current, total, filename)
 
     def on_deleted_files_found(self, deleted_paths):
         for path in deleted_paths:
