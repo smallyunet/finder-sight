@@ -14,7 +14,8 @@ import imagehash
 
 from src.finder_sight.constants import (
     INDEX_FILE, CONFIG_FILE, DEFAULT_MAX_RESULTS, 
-    DEFAULT_SIMILARITY_THRESHOLD, INDEX_VERSION
+    DEFAULT_SIMILARITY_THRESHOLD, INDEX_VERSION,
+    HASH_SIZE, MAX_HASH_DIST
 )
 from src.finder_sight.core.indexer import IndexerThread, IndexLoaderThread
 from src.finder_sight.core.searcher import SearchThread
@@ -238,7 +239,7 @@ class ImageFinderApp(QMainWindow):
                 with Image.open(file_path) as img:
                     if img.mode != 'RGB':
                         img = img.convert('RGB')
-                    target_hash = imagehash.whash(img)
+                    target_hash = imagehash.whash(img, hash_size=HASH_SIZE)
                     self.search_area.set_preview(path=file_path)
             elif image_data:
                 self.sidebar.set_status("Processing paste...")
@@ -248,7 +249,7 @@ class ImageFinderApp(QMainWindow):
                 pil_im = Image.open(io.BytesIO(buffer.data()))
                 if pil_im.mode != 'RGB':
                     pil_im = pil_im.convert('RGB')
-                target_hash = imagehash.whash(pil_im)
+                target_hash = imagehash.whash(pil_im, hash_size=HASH_SIZE)
                 self.search_area.set_preview(image=image_data)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to process input: {e}")
@@ -261,11 +262,17 @@ class ImageFinderApp(QMainWindow):
         self.search_area.set_searching_state(True)
         self.sidebar.set_status("Searching...")
         
+        # Convert percentage (0-100) to distance threshold
+        # Higher % = Lower distance
+        # 100% = 0 distance
+        # 0% = MAX_HASH_DIST
+        threshold_dist = int(MAX_HASH_DIST * (1.0 - self.similarity_threshold / 100.0))
+        
         self.search_thread = SearchThread(
             self.image_hashes, 
             target_hash,
             max_results=self.max_results,
-            similarity_threshold=self.similarity_threshold
+            similarity_threshold=threshold_dist
         )
         self.search_thread.finished.connect(self.on_search_finished)
         self.search_thread.error.connect(lambda e: QMessageBox.critical(self, "Error", e))

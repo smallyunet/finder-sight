@@ -5,7 +5,7 @@ from PyQt6.QtGui import QPixmap, QImageReader
 
 import os
 from src.finder_sight.ui.widgets import DropLabel, ResultWidget
-from src.finder_sight.constants import THUMBNAIL_SIZE
+from src.finder_sight.constants import THUMBNAIL_SIZE, MAX_HASH_DIST
 
 class SearchArea(QWidget):
     # Signals

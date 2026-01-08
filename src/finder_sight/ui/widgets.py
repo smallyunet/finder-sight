@@ -2,6 +2,7 @@ from PyQt6.QtWidgets import QLabel, QWidget, QHBoxLayout, QVBoxLayout, QFrame, Q
 from PyQt6.QtCore import pyqtSignal, Qt, QSize
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMouseEvent, QPixmap, QPainter
 import os
+from src.finder_sight.constants import MAX_HASH_DIST
 
 class ClickableLabel(QLabel):
 
@@ -185,25 +186,26 @@ class ResultWidget(QWidget):
         else:
             self.lbl_name.setText(file_name)
             
-        # Create match confidence (Similarity = 1.0 - distance roughly, or similar)
-        # Assuming distance is Hamming distance (0-64 approx for 8x8 hash? No, user code compares hashes.
-        # User requested similarity tags like "98% Match".
-        # We need to know how 'distance' relates to similarity.
-        # imagehash distance of 0 is exact match.
-        # For pHash/dHash, range is usually small for similar images (< 5-10).
-        # Let's approximate: Similarity = 1 - (dist / 64) ? Usually hash size is 64 bits.
-        # But let's just show what we have, or try to convert.
-        # For now, let's keep it simple or guess: (1 - dist/64) * 100%
-        # NOTE: logic might depend on hash size (64).
-        similarity = max(0, 1.0 - (distance / 64.0)) * 100
-        self.lbl_dist = QLabel(f"{int(similarity)}% Match")
+        # Calculate match percentage
+        # Similarity = 1 - (dist / MAX_HASH_DIST)
+        percentage = max(0, 1.0 - (distance / MAX_HASH_DIST)) * 100
+        
+        self.lbl_dist = QLabel(f"{int(percentage)}% Match")
         self.lbl_dist.setObjectName("ResultScore")
         self.lbl_dist.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        # Color coding for match score
+        if percentage >= 95:
+             self.lbl_dist.setStyleSheet("color: #34C759; font-weight: bold;")
+        elif percentage >= 80:
+             self.lbl_dist.setStyleSheet("color: #007AFF;")
+        else:
+             self.lbl_dist.setStyleSheet("color: #8E8E93;")
         
         info_layout.addWidget(self.lbl_name)
         info_layout.addWidget(self.lbl_dist)
         
         layout.addLayout(info_layout)
-        self.setToolTip(path)
+        self.setToolTip(f"{path}\nDistance: {distance}")
 
 

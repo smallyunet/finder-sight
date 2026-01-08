@@ -11,12 +11,16 @@ SUPPORTED_EXTENSIONS = {
 }
 
 # Search settings
+# Search settings
 DEFAULT_MAX_RESULTS = 20
-DEFAULT_SIMILARITY_THRESHOLD = 8  # Hamming distance for whash
+HASH_SIZE = 16  # 16x16 = 256 bits
+MAX_HASH_DIST = HASH_SIZE * HASH_SIZE  # 256
+# Default to 80% match
+DEFAULT_SIMILARITY_THRESHOLD = 80 
 DEFAULT_PHASH_THRESHOLD = 15  # Fallback
 
 # Indexing
-INDEX_VERSION = "v3_mtime"  # Increment to force re-indexing
+INDEX_VERSION = "v4_hires"  # Increment to force re-indexing
 
 
 # UI settings

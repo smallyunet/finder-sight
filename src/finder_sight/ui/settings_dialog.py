@@ -32,17 +32,17 @@ class SettingsDialog(QDialog):
         search_group = QGroupBox("Search Settings")
         search_layout = QFormLayout()
         
-        # Similarity Threshold
+        # Similarity Threshold (Match Percentage)
         self.threshold_spin = QSpinBox()
         self.threshold_spin.setRange(0, 100)
         self.threshold_spin.setValue(self.similarity_threshold)
-        self.threshold_spin.setSuffix(" (min matches)")
+        self.threshold_spin.setSuffix("%")
         self.threshold_spin.setToolTip(
-            "Minimum number of segment matches required.\n"
-            "0 = show all results with any match.\n"
-            "Higher values = stricter matching."
+            "Minimum similarity percentage required.\n"
+            "100% = Exact match only.\n"
+            "0% = Show all results."
         )
-        search_layout.addRow("Similarity Threshold:", self.threshold_spin)
+        search_layout.addRow("Minimum Match Score:", self.threshold_spin)
         
         # Max Results
         self.max_results_spin = QSpinBox()

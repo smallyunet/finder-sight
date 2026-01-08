@@ -6,7 +6,7 @@ from PIL import Image
 from PyQt6.QtCore import QThread, pyqtSignal
 from concurrent.futures import ProcessPoolExecutor, Future
 
-from src.finder_sight.constants import SUPPORTED_EXTENSIONS
+from src.finder_sight.constants import SUPPORTED_EXTENSIONS, HASH_SIZE
 from src.finder_sight.utils.logger import logger
 
 
@@ -29,7 +29,7 @@ def calculate_hash(file_path: str) -> tuple[str, Optional[str]]:
             if img.mode != 'RGB':
                 img = img.convert('RGB')
             # whash is generally more robust for resized/modified images
-            h = imagehash.whash(img)
+            h = imagehash.whash(img, hash_size=HASH_SIZE)
             return file_path, str(h), mtime
     except Exception as e:
         # Logging happens in main process, just return None
