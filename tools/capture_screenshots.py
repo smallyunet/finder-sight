@@ -89,3 +89,8 @@ def test_capture_main_window(qtbot, tmp_path, monkeypatch):
     
     print(f"\nSaved screenshot to: {screenshot_path}")
     assert os.path.exists(screenshot_path)
+
+
+if __name__ == "__main__":
+    # Allow running this script directly
+    sys.exit(pytest.main([__file__, "-v"]))

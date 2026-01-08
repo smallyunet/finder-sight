@@ -28,7 +28,7 @@ def test_new_supported_extensions():
 
 def test_similarity_threshold_constant():
     """Test that default similarity threshold is defined."""
-    assert DEFAULT_SIMILARITY_THRESHOLD == 8  # Max Hamming distance for phash
+    assert DEFAULT_SIMILARITY_THRESHOLD == 80  # Max Hamming distance for phash
 
 
 def test_search_thread_with_threshold(qtbot):

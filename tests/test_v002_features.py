@@ -17,7 +17,7 @@ def test_index_loader_thread(qtbot):
     # Create a dummy index file
     with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp:
         index_data = {
-            "version": "v3_mtime",
+            "version": "v4_hires",
             "data": {
                 "/path/to/img1.jpg": "0000000000000000",
                 "/path/to/img2.jpg": "ffffffffffffffff"
