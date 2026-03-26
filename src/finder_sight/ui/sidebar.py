@@ -4,6 +4,8 @@ from PyQt6.QtCore import Qt, pyqtSignal, QSize
 from PyQt6.QtGui import QIcon
 
 import os
+import sys
+import subprocess
 
 class FolderItemWidget(QWidget):
     def __init__(self, path):
@@ -57,6 +59,8 @@ class Sidebar(QWidget):
         self.folder_list.setFrameShape(QFrame.Shape.NoFrame)
         self.folder_list.setStyleSheet("background: transparent;")
         self.folder_list.setFocusPolicy(Qt.FocusPolicy.NoFocus) # Remove focus outline
+        self.folder_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.folder_list.customContextMenuRequested.connect(self.show_context_menu)
         layout.addWidget(self.folder_list, 1)
         
         # Footer (Status + Actions)
@@ -106,14 +110,14 @@ class Sidebar(QWidget):
         self.btn_add.setToolTip("Add Folder")
         self.btn_add.setFixedSize(24, 24)
         self.btn_add.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_add.setStyleSheet("QPushButton { color: #1d1d1f; font-weight: bold; padding: 0px; }")
+        self.btn_add.setStyleSheet("QPushButton { color: #1d1d1f; font-weight: bold; padding: 0px; font-size: 16px; }")
         self.btn_add.clicked.connect(self.add_folder_clicked)
         
-        self.btn_remove = QPushButton("-")
+        self.btn_remove = QPushButton("−")
         self.btn_remove.setToolTip("Remove Folder")
         self.btn_remove.setFixedSize(24, 24)
         self.btn_remove.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_remove.setStyleSheet("QPushButton { color: #1d1d1f; font-weight: bold; padding: 0px; }")
+        self.btn_remove.setStyleSheet("QPushButton { color: #1d1d1f; font-weight: bold; padding: 0px; font-size: 16px; }")
         self.btn_remove.clicked.connect(self.remove_folder_clicked)
         
         # Spacer
@@ -122,25 +126,25 @@ class Sidebar(QWidget):
         line.setFrameShadow(QFrame.Shadow.Sunken)
         line.setStyleSheet("color: #c0c0c0;")
         
-        self.btn_refresh = QPushButton("⚡")
+        self.btn_refresh = QPushButton("⟳")
         self.btn_refresh.setToolTip("Index Now")
         self.btn_refresh.setFixedSize(24, 24)
         self.btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_refresh.setStyleSheet("QPushButton { color: #1d1d1f; padding: 0px; }")
+        self.btn_refresh.setStyleSheet("QPushButton { color: #1d1d1f; padding: 0px; font-size: 16px; min-height: 20px }")
         self.btn_refresh.clicked.connect(self.refresh_clicked)
         
-        self.btn_clear = QPushButton("🗑")
+        self.btn_clear = QPushButton("⌫")
         self.btn_clear.setToolTip("Clear Index")
         self.btn_clear.setFixedSize(24, 24)
         self.btn_clear.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_clear.setStyleSheet("QPushButton { color: #d70015; padding: 0px; }")
+        self.btn_clear.setStyleSheet("QPushButton { color: #d70015; padding: 0px; font-size: 16px; min-height: 20px }")
         self.btn_clear.clicked.connect(self.clear_clicked)
         
-        self.btn_info = QPushButton("ℹ")
+        self.btn_info = QPushButton("ⓘ")
         self.btn_info.setToolTip("Index Information")
         self.btn_info.setFixedSize(24, 24)
         self.btn_info.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_info.setStyleSheet("QPushButton { color: #007AFF; padding: 0px; }")
+        self.btn_info.setStyleSheet("QPushButton { color: #007AFF; padding: 0px; font-size: 16px; min-height: 20px }")
         self.btn_info.clicked.connect(self.info_clicked)
         
         actions_layout.addWidget(self.btn_add)
@@ -171,6 +175,32 @@ class Sidebar(QWidget):
     def remove_selected_folder(self):
         for item in self.folder_list.selectedItems():
             self.folder_list.takeItem(self.folder_list.row(item))
+            
+    def show_context_menu(self, position):
+        item = self.folder_list.itemAt(position)
+        if not item:
+            return
+            
+        path = item.data(Qt.ItemDataRole.UserRole)
+        from PyQt6.QtWidgets import QMenu
+        from PyQt6.QtGui import QAction
+        
+        menu = QMenu()
+        reveal_action = menu.addAction("Reveal in Finder")
+        remove_action = menu.addAction("Remove Folder")
+        
+        action = menu.exec(self.folder_list.viewport().mapToGlobal(position))
+        
+        if action == reveal_action:
+            if sys.platform == 'darwin':
+                subprocess.run(['open', '-R', path])
+            elif os.name == 'nt':
+                subprocess.run(['explorer', '/select,', os.path.normpath(path)])
+            else:
+                subprocess.run(['xdg-open', os.path.dirname(path)])
+        elif action == remove_action:
+            item.setSelected(True)
+            self.remove_folder_clicked.emit()
             
     def set_status(self, text, is_indexing=False):
         self.lbl_status.setText(text)

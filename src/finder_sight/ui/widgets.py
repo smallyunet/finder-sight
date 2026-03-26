@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QLabel, QWidget, QHBoxLayout, QVBoxLayout, QFrame, QSizePolicy, QStyle, QStyleOption, QPushButton
-from PyQt6.QtCore import pyqtSignal, Qt, QSize
+from PyQt6.QtWidgets import QLabel, QWidget, QHBoxLayout, QVBoxLayout, QFrame, QSizePolicy, QStyle, QStyleOption, QPushButton, QGraphicsOpacityEffect
+from PyQt6.QtCore import pyqtSignal, Qt, QSize, QPropertyAnimation, QEasingCurve, QTimer
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMouseEvent, QPixmap, QPainter
 import os
 from src.finder_sight.constants import MAX_HASH_DIST
@@ -30,6 +30,22 @@ class DropLabel(QLabel):
         self.setProperty("state", "idle")
         self.setObjectName("DropZone") # Ensure object name is set for styling
         
+        # Animations
+        self.opacity_effect = QGraphicsOpacityEffect(self)
+        self.setGraphicsEffect(self.opacity_effect)
+        self.opacity_effect.setOpacity(1.0)
+        
+        self.anim = QPropertyAnimation(self.opacity_effect, b"opacity")
+        self.anim.setDuration(1200)
+        self.anim.setKeyValueAt(0.0, 1.0)
+        self.anim.setKeyValueAt(0.5, 0.4)
+        self.anim.setKeyValueAt(1.0, 1.0)
+        self.anim.setLoopCount(-1) # Infinite loop
+        
+        self.search_timer = QTimer(self)
+        self.search_timer.timeout.connect(self._update_search_text)
+        self.search_dots = 0
+        
         # Close Button
         self.btn_close = QPushButton("✕", self)
         self.btn_close.setFixedSize(24, 24)
@@ -49,6 +65,11 @@ class DropLabel(QLabel):
                 background-color: rgba(0, 0, 0, 0.7);
             }
         """)
+
+    def _update_search_text(self):
+        self.search_dots = (self.search_dots + 1) % 4
+        dots = "." * self.search_dots
+        self.setText(f"🔍 Searching{dots}")
 
     def on_close_clicked(self):
         self.clear_preview()
@@ -71,10 +92,13 @@ class DropLabel(QLabel):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
             self.setProperty("state", "dragging")
+            self.anim.start()
             self.style().unpolish(self)
             self.style().polish(self)
 
     def dragLeaveEvent(self, event):
+        self.anim.stop()
+        self.opacity_effect.setOpacity(1.0)
         if self._preview_pixmap:
             self.setProperty("state", "preview")
         else:
@@ -87,6 +111,8 @@ class DropLabel(QLabel):
             event.acceptProposedAction()
 
     def dropEvent(self, event: QDropEvent):
+        self.anim.stop()
+        self.opacity_effect.setOpacity(1.0)
         urls = event.mimeData().urls()
         if urls:
             file_path = urls[0].toLocalFile()
@@ -119,10 +145,13 @@ class DropLabel(QLabel):
     def set_searching(self, searching: bool):
         if searching:
             self.clear() # Clear current display (text or pixmap)
-            self.setText("🔍 Searching...")
+            self.search_dots = 0
+            self.setText("🔍 Searching")
+            self.search_timer.start(400)
             self.setProperty("state", "searching")
             self.btn_close.show() # keep showing to allow cancel/clear
         else:
+            self.search_timer.stop()
             if self._preview_pixmap:
                 self.setPixmap(self._preview_pixmap)
                 self.setProperty("state", "preview")
@@ -208,4 +237,14 @@ class ResultWidget(QWidget):
         layout.addLayout(info_layout)
         self.setToolTip(f"{path}\nDistance: {distance}")
 
-
+        # Add fade in animation
+        self.opacity_effect = QGraphicsOpacityEffect(self)
+        self.setGraphicsEffect(self.opacity_effect)
+        self.opacity_effect.setOpacity(0.0)
+        
+        self.anim = QPropertyAnimation(self.opacity_effect, b"opacity")
+        self.anim.setDuration(400)
+        self.anim.setStartValue(0.0)
+        self.anim.setEndValue(1.0)
+        self.anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
+        self.anim.start()

@@ -99,12 +99,15 @@ SearchArea QListWidget {
 SearchArea QListWidget::item {
     border-radius: 8px;
     padding: 4px;
-    /* margin: 4px; Removed margin from item to rely on spacing */
+    background-color: transparent;
+}
+
+SearchArea QListWidget::item:hover {
+    background-color: #f9f9fb;
 }
 
 SearchArea QListWidget::item:selected {
     background-color: #e5e5ea;
-    /* border: 1px solid #007AFF; Optional selection border */
 }
 
 /* --- Result Widget Internal --- */

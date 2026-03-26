@@ -12,7 +12,7 @@ from src.finder_sight.core.indexer import IndexLoaderThread, IndexerThread
 from src.finder_sight.ui.main_window import ImageFinderApp
 from src.finder_sight.constants import INDEX_FILE
 
-def test_index_loader_thread(qtbot):
+def test_index_loader_thread(qtbot, monkeypatch):
     """Test the IndexLoaderThread logic."""
     # Create a dummy index file
     with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp:
@@ -29,6 +29,10 @@ def test_index_loader_thread(qtbot):
         }
         json.dump(index_data, tmp)
         tmp_path = tmp.name
+    
+    # Mock INDEX_PICKLE_FILE so it doesn't load real user index
+    from src.finder_sight import constants
+    monkeypatch.setattr(constants, 'INDEX_PICKLE_FILE', tmp_path + ".pkl")
     
     try:
         thread = IndexLoaderThread(tmp_path)
