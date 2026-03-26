@@ -117,38 +117,54 @@ class IndexerThread(QThread):
             logger.info(f"Found {total_files} new files to index")
             
             # 3. Calculate hashes in parallel (CPU bound)
-            # Use max_workers=None to let it default to CPU count
+            import concurrent.futures
             failed_count = 0
             with ProcessPoolExecutor() as executor:
-                futures: list[Future[tuple[str, Optional[str], Optional[float]]]] = []
-                for file_path in image_files:
-                    if not self.is_running:
-                        executor.shutdown(wait=False, cancel_futures=True)
-                        logger.info("Indexing stopped before starting all tasks")
-                        return
-                    future = executor.submit(calculate_hash, file_path)
-                    futures.append(future)
+                active_futures = set()
+                file_iterator = iter(image_files)
+                processed = 0
+                max_queue_size = (os.cpu_count() or 4) * 2
                 
-                for i, future in enumerate(futures):
+                # Initial fill
+                for _ in range(max_queue_size):
+                    try:
+                        filepath = next(file_iterator)
+                        active_futures.add(executor.submit(calculate_hash, filepath))
+                    except StopIteration:
+                        break
+                
+                while active_futures:
                     if not self.is_running:
                         executor.shutdown(wait=False, cancel_futures=True)
-                        logger.info(f"Indexing stopped at task {i+1}/{total_files}")
+                        logger.info("Indexing stopped")
                         return
+
+                    done, active_futures = concurrent.futures.wait(
+                        active_futures, return_when=concurrent.futures.FIRST_COMPLETED, timeout=1.0)
                     
-                    try:
-                        file_path, hash_str, mtime = future.result(timeout=30)
-                        if hash_str and mtime:
-                            index_data[file_path] = hash_str
-                            mtime_data[file_path] = mtime
-                        else:
+                    for future in done:
+                        processed += 1
+                        try:
+                            file_path, hash_str, mtime = future.result()
+                            if hash_str and mtime:
+                                index_data[file_path] = hash_str
+                                mtime_data[file_path] = mtime
+                            else:
+                                failed_count += 1
+                                logger.debug(f"Failed to hash: {file_path}")
+                        except Exception as e:
                             failed_count += 1
-                            logger.debug(f"Failed to hash: {file_path}")
-                    except Exception as e:
-                        failed_count += 1
-                        logger.warning(f"Error processing file: {e}")
-                    
-                    # Emit progress
-                    self.progress_update.emit(i + 1, total_files, image_files[i])
+                            logger.warning(f"Error processing file: {e}")
+                        
+                        # Emit progress
+                        self.progress_update.emit(processed, total_files, file_path)
+                        
+                        # Top up the queue
+                        try:
+                            filepath = next(file_iterator)
+                            active_futures.add(executor.submit(calculate_hash, filepath))
+                        except StopIteration:
+                            pass
 
             logger.info(
                 f"Indexing complete: {len(index_data)} succeeded, {failed_count} failed"
@@ -178,19 +194,43 @@ class IndexLoaderThread(QThread):
         self.index_file = index_file
 
     def run(self) -> None:
-        if not os.path.exists(self.index_file):
-            self.finished.emit({}, {}, {})
-            return
+        import os
+        import pickle
+        import json
+        from src.finder_sight.constants import INDEX_VERSION, INDEX_PICKLE_FILE
+        
+        pickle_path = INDEX_PICKLE_FILE
+        json_path = self.index_file
 
         try:
-            import json
-            with open(self.index_file, 'r') as f:
+            # 1. Try loading fast pickle format first
+            if os.path.exists(pickle_path):
+                logger.info(f"Loading fast pickle index from {pickle_path}")
+                try:
+                    with open(pickle_path, 'rb') as f:
+                        data = pickle.load(f)
+                    if data.get("version") == INDEX_VERSION:
+                        index_data = data.get("data", {})
+                        mtime_data = data.get("mtimes", {})
+                        hash_data = data.get("hashes", {})
+                        logger.info("Successfully loaded pickle index.")
+                        self.finished.emit(index_data, hash_data, mtime_data)
+                        return
+                    else:
+                        logger.warning("Pickle index version mismatch, falling back...")
+                except Exception as e:
+                    logger.warning(f"Failed to load pickle index: {e}")
+
+            # 2. Fallback to json format
+            if not os.path.exists(json_path):
+                self.finished.emit({}, {}, {})
+                return
+
+            logger.info("Loading fallback json index...")
+            with open(json_path, 'r') as f:
                 data = json.load(f)
             
             # Check version
-            from src.finder_sight.constants import INDEX_VERSION
-            
-            # Support legacy (flat dict) vs new (versioned dict)
             if "version" in data and "data" in data:
                 loaded_version = data["version"]
                 index_data = data["data"]
@@ -201,9 +241,6 @@ class IndexLoaderThread(QThread):
                     self.finished.emit({}, {}, {})
                     return
             else:
-                # Legacy file is treated as incompatible if we enforced versioning
-                # But for migration we can check. Since we are moving phash -> whash, they are NOT compatible.
-                # So we must drop legacy index.
                 logger.warning("Legacy index detected. Ignoring incompatible index.")
                 self.finished.emit({}, {}, {})
                 return
@@ -216,10 +253,9 @@ class IndexLoaderThread(QThread):
                     # Ignore invalid hashes
                     pass
             
+            logger.info("Successfully loaded json index.")
             self.finished.emit(index_data, hash_data, mtime_data)
             
         except Exception as e:
-            self.error.emit(str(e))
-            
-        except Exception as e:
+            logger.error(f"Index Loader Error: {e}")
             self.error.emit(str(e))

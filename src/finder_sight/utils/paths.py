@@ -29,3 +29,6 @@ def get_config_path(filename="config.json"):
 
 def get_index_path(filename="image_index.json"):
     return get_user_data_dir() / filename
+
+def get_pickle_index_path(filename="image_index.pkl"):
+    return get_user_data_dir() / filename

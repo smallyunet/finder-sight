@@ -1,8 +1,12 @@
-from typing import Any
+import io
+import heapq
+from typing import Any, Optional
 
 from PyQt6.QtCore import QThread, pyqtSignal
+from PIL import Image
+import imagehash
 
-from src.finder_sight.constants import DEFAULT_MAX_RESULTS, DEFAULT_SIMILARITY_THRESHOLD
+from src.finder_sight.constants import DEFAULT_MAX_RESULTS, DEFAULT_SIMILARITY_THRESHOLD, HASH_SIZE
 from src.finder_sight.utils.logger import logger
 
 
@@ -17,20 +21,47 @@ class SearchThread(QThread):
     def __init__(
         self,
         image_hashes: dict[str, Any],
-        target_hash: Any,
+        target_hash: Any = None,
+        target_image_path: Optional[str] = None,
+        target_image_bytes: Optional[bytes] = None,
         max_results: int = DEFAULT_MAX_RESULTS,
-        similarity_threshold: int = DEFAULT_SIMILARITY_THRESHOLD,  # Use default similarity threshold
-        use_phash: bool = True  # New flag to select hash algorithm
+        similarity_threshold: int = DEFAULT_SIMILARITY_THRESHOLD,
+        use_phash: bool = True 
     ) -> None:
         super().__init__()
         self.image_hashes = image_hashes
         self.target_hash = target_hash
+        self.target_image_path = target_image_path
+        self.target_image_bytes = target_image_bytes
         self.max_results = max_results
         self.similarity_threshold = similarity_threshold
         self.use_phash = use_phash
 
     def run(self) -> None:
+        # Pre-process target hash if not provided
+        if self.target_hash is None:
+            try:
+                if self.target_image_path:
+                    logger.info("Computing hash for image path...")
+                    with Image.open(self.target_image_path) as img:
+                        if img.mode != 'RGB':
+                            img = img.convert('RGB')
+                        self.target_hash = imagehash.whash(img, hash_size=HASH_SIZE)
+                elif self.target_image_bytes:
+                    logger.info("Computing hash for image bytes...")
+                    pil_im = Image.open(io.BytesIO(self.target_image_bytes))
+                    if pil_im.mode != 'RGB':
+                        pil_im = pil_im.convert('RGB')
+                    self.target_hash = imagehash.whash(pil_im, hash_size=HASH_SIZE)
+                else:
+                    raise ValueError("No target provided for search.")
+            except Exception as e:
+                logger.error(f"Failed to process target image: {e}")
+                self.error.emit(str(e))
+                return
+
         results: list[tuple[str, int]] = []
+        closest_heap: list[tuple[int, str]] = []  # Max-heap storing (-distance, path)
         total = len(self.image_hashes)
 
         try:
@@ -41,19 +72,18 @@ class SearchThread(QThread):
 
                 try:
                     # Determine distance based on selected hash algorithm
-                    if self.use_phash:
-                        # h and target_hash are assumed to be ImageHash objects (phash)
-                        dist = h - self.target_hash
+                    dist = h - self.target_hash
+
+                    # 1. Maintain a bounded max-heap of the top closest items
+                    if len(closest_heap) < self.max_results:
+                        heapq.heappush(closest_heap, (-dist, path))
                     else:
-                        # For crop_resistant_hash, use Hamming distance as well (hash objects support subtraction)
-                        dist = h - self.target_hash
+                        # If the heap is full, push only if distance is smaller than the largest in the heap
+                        if -dist > closest_heap[0][0]:
+                            heapq.heappushpop(closest_heap, (-dist, path))
 
-                    # If similarity_threshold is negative, treat as no-match (skip all results)
-                    if self.similarity_threshold < 0:
-                        continue
-
-                    # Include only if distance is within the threshold
-                    if dist <= self.similarity_threshold:
+                    # 2. Check if the distance meets the similarity threshold
+                    if self.similarity_threshold >= 0 and dist <= self.similarity_threshold:
                         results.append((path, dist))
                 except Exception as e:
                     logger.debug(f"Failed to compare hash for {path}: {e}")
@@ -63,37 +93,18 @@ class SearchThread(QThread):
                 if (i + 1) % 50 == 0 or i == total - 1:
                     self.progress.emit(i + 1, total)
 
-            # Sort by distance (ascending)
+            # Sort threshold-passed results by distance (ascending)
             results.sort(key=lambda x: x[1])
 
-            # If no results meet the threshold and the threshold is non-negative, fallback to nearest max_results
+            # If no results meet the threshold, fallback to the nearest ones we collected in the heap
             if not results and self.similarity_threshold >= 0:
-                # Calculate distances for ALL items to find the nearest ones
-                fallback: list[tuple[str, int]] = []
-                for path, h in self.image_hashes.items():
-                    try:
-                        # Determine distance based on selected hash algorithm
-                        # We repeat the calculation here to be sure, or we could have stored them.
-                        # Since we want to find the BEST fallback, we must check everything.
-                        if self.use_phash:
-                            dist = h - self.target_hash
-                        else:
-                            dist = h - self.target_hash
-                        fallback.append((path, dist))
-                    except Exception as e:
-                        # Skip invalid hashes
-                        continue
-                
-                # Sort fallback results by distance
+                fallback = [(p, -d) for d, p in closest_heap]
                 fallback.sort(key=lambda x: x[1])
-                # Take top N
-                results = fallback[:self.max_results]
+                results = fallback
 
-
-
-            # Return top N results (already limited by max_results)
+            # Return top N results
             self.finished.emit(results[:self.max_results])
-            logger.info(f"Search completed, found {len(results)} matches (including fallback if needed)")
+            logger.info(f"Search completed, found {len(results)} fallback/matches")
 
         except Exception as e:
             logger.error(f"Search failed: {e}")

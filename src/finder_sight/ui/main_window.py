@@ -13,7 +13,7 @@ from PIL import Image
 import imagehash
 
 from src.finder_sight.constants import (
-    INDEX_FILE, CONFIG_FILE, DEFAULT_MAX_RESULTS, 
+    INDEX_FILE, INDEX_PICKLE_FILE, CONFIG_FILE, DEFAULT_MAX_RESULTS, 
     DEFAULT_SIMILARITY_THRESHOLD, INDEX_VERSION,
     HASH_SIZE, MAX_HASH_DIST
 )
@@ -96,15 +96,16 @@ class ImageFinderApp(QMainWindow):
         import os
         import time
         from src.finder_sight.ui.index_manager_dialog import IndexManagerDialog
-        from src.finder_sight.constants import INDEX_FILE
+        from src.finder_sight.constants import INDEX_FILE, INDEX_PICKLE_FILE
         
         count = len(self.image_index)
         last_mod = None
-        if os.path.exists(INDEX_FILE):
-             t = os.path.getmtime(INDEX_FILE)
+        target_file = INDEX_PICKLE_FILE if os.path.exists(INDEX_PICKLE_FILE) else INDEX_FILE
+        if os.path.exists(target_file):
+             t = os.path.getmtime(target_file)
              last_mod = time.ctime(t)
              
-        dialog = IndexManagerDialog(self, os.path.abspath(INDEX_FILE), count, last_mod)
+        dialog = IndexManagerDialog(self, os.path.abspath(target_file), count, last_mod)
         dialog.clear_requested.connect(self.clear_index_confirmed)
         dialog.exec()
         
@@ -192,14 +193,20 @@ class ImageFinderApp(QMainWindow):
             logger.info(f"Indexing finished: {len(index_data)} new images")
 
     def save_index(self):
+        import pickle
+        import os
         try:
             data = {
                 "version": INDEX_VERSION,
                 "data": self.image_index,
-                "mtimes": self.image_mtimes
+                "mtimes": self.image_mtimes,
+                "hashes": self.image_hashes
             }
-            with open(INDEX_FILE, 'w') as f:
-                json.dump(data, f)
+            with open(INDEX_PICKLE_FILE, 'wb') as f:
+                pickle.dump(data, f)
+            if os.path.exists(INDEX_FILE):
+                try: os.remove(INDEX_FILE)
+                except: pass
         except Exception as e:
             logger.error(f"Failed to save index: {e}")
 
@@ -232,31 +239,27 @@ class ImageFinderApp(QMainWindow):
             self.search_thread.requestInterruption()
             self.search_thread.wait()
 
-        target_hash = None
+        target_path = None
+        target_bytes = None
         try:
             if file_path:
-                self.sidebar.set_status("Processing image...")
-                with Image.open(file_path) as img:
-                    if img.mode != 'RGB':
-                        img = img.convert('RGB')
-                    target_hash = imagehash.whash(img, hash_size=HASH_SIZE)
-                    self.search_area.set_preview(path=file_path)
+                self.sidebar.set_status("Starting search...")
+                self.search_area.set_preview(path=file_path)
+                target_path = file_path
             elif image_data:
-                self.sidebar.set_status("Processing paste...")
+                self.sidebar.set_status("Starting search for paste...")
+                self.search_area.set_preview(image=image_data)
+                
                 buffer = QBuffer()
                 buffer.open(QIODevice.OpenModeFlag.ReadWrite)
                 image_data.save(buffer, "PNG")
-                pil_im = Image.open(io.BytesIO(buffer.data()))
-                if pil_im.mode != 'RGB':
-                    pil_im = pil_im.convert('RGB')
-                target_hash = imagehash.whash(pil_im, hash_size=HASH_SIZE)
-                self.search_area.set_preview(image=image_data)
+                target_bytes = buffer.data().data()
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to process input: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to setup search: {e}")
             self.sidebar.set_status("Error processing")
             return
 
-        if target_hash is None:
+        if target_path is None and target_bytes is None:
             return
 
         self.search_area.set_searching_state(True)
@@ -269,8 +272,9 @@ class ImageFinderApp(QMainWindow):
         threshold_dist = int(MAX_HASH_DIST * (1.0 - self.similarity_threshold / 100.0))
         
         self.search_thread = SearchThread(
-            self.image_hashes, 
-            target_hash,
+            image_hashes=self.image_hashes, 
+            target_image_path=target_path,
+            target_image_bytes=target_bytes,
             max_results=self.max_results,
             similarity_threshold=threshold_dist
         )
