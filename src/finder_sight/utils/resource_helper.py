@@ -2,15 +2,26 @@ import sys
 import os
 
 def get_resource_path(relative_path):
-    """ Get absolute path to resource, works for dev and for PyInstaller """
-    try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        base_path = sys._MEIPASS
-    except Exception:
-        # In dev mode, we assume the relative path is from the project root
-        # If relative_path is 'src/finder_sight/ui/style.qss', and we run from project root, it works.
-        # But if we run from somewhere else, it might be safer to be relative to this file?
-        # Let's assume relative_path starts from project root for now.
-        base_path = os.path.abspath(".")
+    """Get an absolute resource path in dev and PyInstaller app bundles."""
+    candidate_roots = []
 
-    return os.path.join(base_path, relative_path)
+    if getattr(sys, "frozen", False):
+        executable_dir = os.path.dirname(sys.executable)
+        candidate_roots.extend([
+            getattr(sys, "_MEIPASS", ""),
+            os.path.join(executable_dir, "..", "Resources"),
+            os.path.join(executable_dir, "..", "Frameworks"),
+            executable_dir,
+        ])
+
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    candidate_roots.extend([project_root, os.path.abspath(".")])
+
+    for root in candidate_roots:
+        if not root:
+            continue
+        candidate = os.path.abspath(os.path.join(root, relative_path))
+        if os.path.exists(candidate):
+            return candidate
+
+    return os.path.abspath(os.path.join(candidate_roots[0], relative_path))

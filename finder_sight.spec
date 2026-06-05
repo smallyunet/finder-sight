@@ -1,5 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import re
+from pathlib import Path
+
+
+def get_app_version():
+    init_file = Path('src/finder_sight/__init__.py')
+    match = re.search(r'__version__\s*=\s*"([^"]+)"', init_file.read_text())
+    return match.group(1) if match else '0.0.0'
+
 
 a = Analysis(
     ['run.py'],
@@ -46,4 +55,5 @@ app = BUNDLE(
     name='Finder Sight.app',
     icon='icon.icns',
     bundle_identifier='com.smallyunet.finder-sight',
+    version=get_app_version(),
 )
