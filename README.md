@@ -50,7 +50,7 @@ You can download the latest pre-built version of Finder Sight for macOS from the
    source .venv/bin/activate
    ```
 
-3. **Install dependencies**
+3. **Install runtime dependencies**
    ```bash
    pip install -r requirements.txt
    ```
@@ -82,11 +82,21 @@ You can download the latest pre-built version of Finder Sight for macOS from the
 This project uses `pytest` for testing.
 
 ```bash
-# Install test dependencies
-pip install pytest pytest-qt
+# Install development dependencies
+pip install -e ".[test]"
 
 # Run tests
 pytest tests/
+```
+
+### Building the macOS App
+
+```bash
+# Install build dependencies
+pip install -e ".[build]"
+
+# Create a clean app bundle in dist/
+make build
 ```
 
 ### CI/CD

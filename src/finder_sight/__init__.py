@@ -5,4 +5,4 @@ except ImportError:
         from importlib.metadata import version, PackageNotFoundError
         __version__ = version("finder-sight")
     except (ImportError, PackageNotFoundError):
-        __version__ = "0.1.1"
+        __version__ = "0.1.2"
