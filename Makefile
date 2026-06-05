@@ -1,15 +1,17 @@
 .PHONY: install install-dev build clean screenshot
 
+PYTHON := $(shell if [ -x .venv/bin/python ]; then echo .venv/bin/python; else echo python3; fi)
+
 install:
-	python3 -m pip install -r requirements.txt
+	$(PYTHON) -m pip install -r requirements.txt
 
 install-dev:
-	python3 -m pip install -e ".[test,build]"
+	$(PYTHON) -m pip install -e ".[test,build]"
 
 build:
 	rm -rf build dist
-	python3 tools/sync_version.py
-	python3 -m PyInstaller finder_sight.spec
+	$(PYTHON) tools/sync_version.py
+	$(PYTHON) -m PyInstaller finder_sight.spec
 
 clean:
 	rm -rf build dist

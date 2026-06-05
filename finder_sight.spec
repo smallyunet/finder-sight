@@ -19,7 +19,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['pytest', '_pytest', 'pygments', 'tests'],
     noarchive=False,
 )
 pyz = PYZ(a.pure)
