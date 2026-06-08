@@ -140,8 +140,106 @@ QSplitter::handle {
 }
 
 /* --- Dialogs & Common --- */
-QPushButton {
-    padding: 4px 12px;
-    border-radius: 6px;
+QDialog {
+    background-color: #f5f5f7;
+}
+
+QGroupBox {
+    font-weight: 600;
     font-size: 12px;
+    color: #1d1d1f;
+    border: 1px solid #d1d1d6;
+    border-radius: 8px;
+    margin-top: 16px;
+    padding: 12px;
+    background-color: #ffffff;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: 10px;
+    padding: 0 4px;
+    background-color: #f5f5f7; /* Match dialog background so it cuts the border cleanly */
+}
+
+QPushButton {
+    background-color: #ffffff;
+    border: 1px solid #c7c7cc;
+    border-radius: 6px;
+    padding: 6px 12px;
+    color: #1d1d1f;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+QPushButton:hover {
+    background-color: #f5f5f7;
+}
+
+QPushButton:pressed {
+    background-color: #e5e5ea;
+}
+
+QPushButton:default {
+    background-color: #007AFF;
+    border-color: #007AFF;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+QPushButton:default:hover {
+    background-color: #0062cc;
+    border-color: #0062cc;
+}
+
+QPushButton:default:pressed {
+    background-color: #0051a8;
+    border-color: #0051a8;
+}
+
+QSpinBox {
+    background-color: #ffffff;
+    border: 1px solid #c7c7cc;
+    border-radius: 5px;
+    padding: 4px;
+    color: #1d1d1f;
+    font-size: 12px;
+}
+
+QSpinBox:focus {
+    border-color: #007AFF;
+}
+
+/* --- QSlider --- */
+QSlider::groove:horizontal {
+    border: none;
+    height: 4px;
+    background: #e5e5ea;
+    border-radius: 2px;
+}
+
+QSlider::sub-page:horizontal {
+    background: #007AFF;
+    border-radius: 2px;
+}
+
+QSlider::handle:horizontal {
+    background: #ffffff;
+    border: 1px solid #c7c7cc;
+    width: 16px;
+    height: 16px;
+    margin-top: -6px;
+    border-radius: 8px;
+}
+
+QSlider::handle:horizontal:hover {
+    background: #f5f5f7;
+    border-color: #a6a6a6;
+}
+
+/* --- Sidebar Footer --- */
+#SidebarFooter {
+    background-color: #ececed;
+    border-top: 1px solid #d1d1d6;
 }

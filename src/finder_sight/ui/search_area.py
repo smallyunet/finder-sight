@@ -49,12 +49,13 @@ class SearchArea(QWidget):
         # Container for relative positioning of the "X" button if needed, 
         # or simplified: The DropLabel itself is the zone.
         
-        self.drop_zone = DropLabel("Drag Image Here\nor Paste (Cmd+V)")
+        self.drop_zone = DropLabel("Drag Image Here, Paste (Cmd+V),\nor Click to Browse")
         self.drop_zone.setObjectName("DropZone")
         self.drop_zone.setFixedHeight(200)
         self.drop_zone.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.drop_zone.dropped.connect(self.image_dropped.emit)
         self.drop_zone.cleared.connect(self.clear)
+        self.drop_zone.clicked.connect(self.select_file)
         
         layout.addWidget(self.drop_zone)
         
@@ -84,6 +85,8 @@ class SearchArea(QWidget):
         self.result_list.setFrameShape(QFrame.Shape.NoFrame)
         self.result_list.setStyleSheet("background: transparent;")
         self.result_list.itemDoubleClicked.connect(self.on_item_double_clicked)
+        self.result_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.result_list.customContextMenuRequested.connect(self.show_context_menu)
         
         self.stack.addWidget(self.result_list)
         self.stack.addWidget(self.empty_state)
@@ -167,6 +170,55 @@ class SearchArea(QWidget):
         path = item.data(Qt.ItemDataRole.UserRole)
         if path:
             self.result_double_clicked.emit(path)
+
+    def select_file(self):
+        from PyQt6.QtWidgets import QFileDialog
+        from src.finder_sight.constants import SUPPORTED_EXTENSIONS
+        
+        filter_str = "Images (" + " ".join([f"*{ext}" for ext in SUPPORTED_EXTENSIONS]) + ")"
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Search Image",
+            "",
+            filter_str
+        )
+        if file_path:
+            self.image_dropped.emit(file_path)
+
+    def show_context_menu(self, position):
+        item = self.result_list.itemAt(position)
+        if not item:
+            return
+            
+        path = item.data(Qt.ItemDataRole.UserRole)
+        if not path or not os.path.exists(path):
+            return
+            
+        from PyQt6.QtWidgets import QMenu
+        from PyQt6.QtGui import QAction, QGuiApplication, QPixmap
+        
+        menu = QMenu()
+        reveal_action = menu.addAction("Reveal in Finder")
+        open_action = menu.addAction("Open Image")
+        copy_path_action = menu.addAction("Copy Path")
+        copy_image_action = menu.addAction("Copy Image")
+        
+        action = menu.exec(self.result_list.viewport().mapToGlobal(position))
+        
+        if action == reveal_action:
+            self.result_double_clicked.emit(path)
+        elif action == open_action:
+            from PyQt6.QtGui import QDesktopServices
+            from PyQt6.QtCore import QUrl
+            QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+        elif action == copy_path_action:
+            clipboard = QGuiApplication.clipboard()
+            clipboard.setText(path)
+        elif action == copy_image_action:
+            clipboard = QGuiApplication.clipboard()
+            pixmap = QPixmap(path)
+            if not pixmap.isNull():
+                clipboard.setImage(pixmap.toImage())
 
     def clear(self):
         self.drop_zone.clear_preview()

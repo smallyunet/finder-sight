@@ -54,7 +54,11 @@ class IndexManagerDialog(QDialog):
         
         self.btn_clear = QPushButton("Clear Index")
         self.btn_clear.clicked.connect(self.on_clear_clicked)
-        self.btn_clear.setStyleSheet("color: red;")
+        self.btn_clear.setStyleSheet(
+            "QPushButton { color: #d70015; border-color: #ffb3b8; } "
+            "QPushButton:hover { background-color: #ffe5e6; } "
+            "QPushButton:pressed { background-color: #fccdcf; }"
+        )
         
         action_layout.addWidget(self.btn_clear)
         action_layout.addStretch()

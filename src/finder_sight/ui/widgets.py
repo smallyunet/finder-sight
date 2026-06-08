@@ -20,6 +20,7 @@ class ClickableLabel(QLabel):
 class DropLabel(QLabel):
     dropped = pyqtSignal(str)
     cleared = pyqtSignal()
+    clicked = pyqtSignal()
 
     def __init__(self, title):
         super().__init__(title)
@@ -29,6 +30,7 @@ class DropLabel(QLabel):
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setProperty("state", "idle")
         self.setObjectName("DropZone") # Ensure object name is set for styling
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         
         # Animations
         self.opacity_effect = QGraphicsOpacityEffect(self)
@@ -74,6 +76,12 @@ class DropLabel(QLabel):
     def on_close_clicked(self):
         self.clear_preview()
         self.cleared.emit()
+
+    def mousePressEvent(self, event: QMouseEvent):
+        if event.button() == Qt.MouseButton.LeftButton:
+            if not self.btn_close.geometry().contains(event.pos()) or self.btn_close.isHidden():
+                self.clicked.emit()
+        super().mousePressEvent(event)
 
     def resizeEvent(self, event):
         # Position top-right

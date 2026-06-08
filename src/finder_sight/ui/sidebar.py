@@ -10,22 +10,33 @@ import subprocess
 class FolderItemWidget(QWidget):
     def __init__(self, path):
         super().__init__()
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 4, 8, 4)
-        layout.setSpacing(2)
+        main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(4, 4, 4, 4)
+        main_layout.setSpacing(8)
+        
+        # Folder Icon
+        self.icon_lbl = QLabel()
+        icon = self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon)
+        self.icon_lbl.setPixmap(icon.pixmap(20, 20))
+        main_layout.addWidget(self.icon_lbl)
+        
+        # Text layout
+        text_layout = QVBoxLayout()
+        text_layout.setContentsMargins(0, 0, 0, 0)
+        text_layout.setSpacing(2)
         
         # Primary: Folder Name
         self.lbl_name = QLabel(os.path.basename(path) or path)
         self.lbl_name.setStyleSheet("font-weight: 500; font-size: 13px; color: #1d1d1f;")
-        layout.addWidget(self.lbl_name)
+        text_layout.addWidget(self.lbl_name)
         
         # Secondary: Full Path
         self.lbl_path = QLabel(path)
         self.lbl_path.setStyleSheet("font-size: 11px; color: #86868b;")
         self.lbl_path.setWordWrap(False)
-        # Elide text if too long? For now just let it clip or scroll if possible, 
-        # but standard QListWidget item clipping is usually enough.
-        layout.addWidget(self.lbl_path)
+        text_layout.addWidget(self.lbl_path)
+        
+        main_layout.addLayout(text_layout, 1)
 
 class Sidebar(QWidget):
     add_folder_clicked = pyqtSignal()
@@ -65,6 +76,7 @@ class Sidebar(QWidget):
         
         # Footer (Status + Actions)
         footer = QWidget()
+        footer.setObjectName("SidebarFooter")
         footer.setMinimumHeight(80)  # Ensure footer is always visible
         footer_layout = QVBoxLayout(footer)
         footer_layout.setContentsMargins(0, 8, 0, 8)

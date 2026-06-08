@@ -87,6 +87,7 @@ class ImageFinderApp(QMainWindow):
         self.search_area.image_dropped.connect(self.search_image)
         self.search_area.image_pasted.connect(lambda img: self.search_image(image_data=img))
         self.search_area.result_double_clicked.connect(self.reveal_in_finder)
+        self.search_area.drop_zone.cleared.connect(self.cancel_search)
         
         # Set initial splitter sizes (Sidebar ~250px, Rest for Content)
         self.splitter.setSizes([250, 750])
@@ -287,6 +288,12 @@ class ImageFinderApp(QMainWindow):
         self.search_area.show_results(results)
         self.sidebar.set_status("Ready")
 
+    def cancel_search(self):
+        if self.search_thread and self.search_thread.isRunning():
+            self.search_thread.requestInterruption()
+            self.search_thread.wait()
+        self.sidebar.set_status("Ready")
+
     # --- Utils ---
     def reveal_in_finder(self, path):
         if sys.platform == 'darwin':
@@ -350,9 +357,14 @@ class ImageFinderApp(QMainWindow):
         file_menu.addAction(clear_action)
         
         edit_menu = menu_bar.addMenu("&Edit")
+        
+        paste_action = QAction("&Paste Image", self)
+        paste_action.setShortcut(QKeySequence.StandardKey.Paste)
+        paste_action.triggered.connect(self.paste_from_clipboard)
+        edit_menu.addAction(paste_action)
+        
         settings_action = QAction("&Settings...", self)
         settings_action.setShortcut("Ctrl+,")
-        settings_action.triggered.connect(self.show_settings)
         settings_action.triggered.connect(self.show_settings)
         edit_menu.addAction(settings_action)
 
@@ -360,6 +372,34 @@ class ImageFinderApp(QMainWindow):
         update_action = QAction("Check for Updates...", self)
         update_action.triggered.connect(self.check_updates)
         help_menu.addAction(update_action)
+
+    def paste_from_clipboard(self):
+        from PyQt6.QtWidgets import QMessageBox
+        from src.finder_sight.constants import SUPPORTED_EXTENSIONS
+        
+        clipboard = QApplication.clipboard()
+        mime_data = clipboard.mimeData()
+        
+        if mime_data.hasImage():
+            image = clipboard.image()
+            if not image.isNull():
+                self.search_image(image_data=image)
+        elif mime_data.hasUrls():
+            urls = mime_data.urls()
+            if urls:
+                file_path = urls[0].toLocalFile()
+                if os.path.exists(file_path):
+                    ext = os.path.splitext(file_path)[1].lower()
+                    if ext in SUPPORTED_EXTENSIONS:
+                        self.search_image(file_path=file_path)
+                    else:
+                        QMessageBox.warning(self, "Unsupported File", f"Pasted file is not a supported image format: {ext}")
+        elif mime_data.hasText():
+            text = mime_data.text().strip()
+            if os.path.exists(text):
+                ext = os.path.splitext(text)[1].lower()
+                if ext in SUPPORTED_EXTENSIONS:
+                    self.search_image(file_path=text)
 
     def show_settings(self):
         current_settings = {

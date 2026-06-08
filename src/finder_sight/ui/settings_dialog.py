@@ -1,7 +1,7 @@
 """Settings dialog for configuring application preferences."""
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-    QSpinBox, QPushButton, QGroupBox, QFormLayout
+    QSpinBox, QPushButton, QGroupBox, QFormLayout, QSlider
 )
 from PyQt6.QtCore import Qt
 
@@ -33,16 +33,34 @@ class SettingsDialog(QDialog):
         search_layout = QFormLayout()
         
         # Similarity Threshold (Match Percentage)
+        threshold_layout = QHBoxLayout()
+        
+        self.threshold_slider = QSlider(Qt.Orientation.Horizontal)
+        self.threshold_slider.setRange(0, 100)
+        self.threshold_slider.setValue(self.similarity_threshold)
+        self.threshold_slider.setTickInterval(10)
+        self.threshold_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        
         self.threshold_spin = QSpinBox()
         self.threshold_spin.setRange(0, 100)
         self.threshold_spin.setValue(self.similarity_threshold)
         self.threshold_spin.setSuffix("%")
+        self.threshold_spin.setFixedWidth(70)
+        
+        # Connect signals to synchronize slider and spinbox
+        self.threshold_slider.valueChanged.connect(self.threshold_spin.setValue)
+        self.threshold_spin.valueChanged.connect(self.threshold_slider.setValue)
+        
         self.threshold_spin.setToolTip(
             "Minimum similarity percentage required.\n"
             "100% = Exact match only.\n"
             "0% = Show all results."
         )
-        search_layout.addRow("Minimum Match Score:", self.threshold_spin)
+        self.threshold_slider.setToolTip(self.threshold_spin.toolTip())
+        
+        threshold_layout.addWidget(self.threshold_slider)
+        threshold_layout.addWidget(self.threshold_spin)
+        search_layout.addRow("Minimum Match Score:", threshold_layout)
         
         # Max Results
         self.max_results_spin = QSpinBox()
