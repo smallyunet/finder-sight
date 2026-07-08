@@ -30,14 +30,31 @@ class EmptyStateWidget(QWidget):
             self.sub_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(self.sub_lbl)
 
+        self.action_button = QPushButton("")
+        self.action_button.hide()
+        layout.addWidget(self.action_button, 0, Qt.AlignmentFlag.AlignCenter)
+
+    def configure(self, icon_text, message_text, sub_text="", action_text=""):
+        self.icon_lbl.setText(icon_text)
+        self.msg_lbl.setText(message_text)
+        if hasattr(self, "sub_lbl"):
+            self.sub_lbl.setText(sub_text)
+            self.sub_lbl.setVisible(bool(sub_text))
+        self.action_button.setText(action_text)
+        self.action_button.setVisible(bool(action_text))
+
 class SearchArea(QWidget):
     # Signals
     image_dropped = pyqtSignal(str) # Path
     image_pasted = pyqtSignal(object) # QImage
     result_double_clicked = pyqtSignal(str) # Path
+    add_folder_requested = pyqtSignal()
+    index_requested = pyqtSignal()
+    settings_requested = pyqtSignal()
     
     def __init__(self):
         super().__init__()
+        self.current_mode = "search"
         self.init_ui()
         
     def init_ui(self):
@@ -63,7 +80,7 @@ class SearchArea(QWidget):
         
         # Header / Status
         self.header_layout = QHBoxLayout()
-        self.lbl_results_title = QLabel("Matches")
+        self.lbl_results_title = QLabel("Search Matches")
         self.lbl_results_title.setStyleSheet("font-size: 14px; font-weight: 600; color: #1d1d1f;")
         self.header_layout.addWidget(self.lbl_results_title)
         
@@ -74,7 +91,8 @@ class SearchArea(QWidget):
         # Grid and Empty State via Stack
         self.stack = QStackedWidget()
         
-        self.empty_state = EmptyStateWidget("🔍", "No Matches Found", "Try adjusting the similarity threshold\nor adding more folders to your library.")
+        self.empty_state = EmptyStateWidget("⌕", "No Matches Found", "Try adjusting the similarity threshold\nor adding more folders to your library.")
+        self.empty_state.action_button.clicked.connect(self.on_empty_action_clicked)
         
         self.result_list = QListWidget()
         self.result_list.setViewMode(QListWidget.ViewMode.IconMode)
@@ -100,6 +118,7 @@ class SearchArea(QWidget):
             self.drop_zone.set_preview_image(pixmap=QPixmap.fromImage(image))
             
     def set_searching_state(self, is_searching):
+        self.current_mode = "search"
         self.drop_zone.set_searching(is_searching)
         if hasattr(self, 'populate_timer') and self.populate_timer.isActive():
             self.populate_timer.stop()
@@ -119,6 +138,7 @@ class SearchArea(QWidget):
         """
         results: list of (path, distance) tuples
         """
+        self.current_mode = "search"
         self.result_list.setViewMode(QListWidget.ViewMode.IconMode)
         self.result_list.setIconSize(QSize(120, 140))
         self.result_list.clear()
@@ -128,9 +148,12 @@ class SearchArea(QWidget):
         
         if not results:
             self.lbl_results_title.setText("No Matches Found")
-            self.empty_state.msg_lbl.setText("No Matches Found")
-            if hasattr(self.empty_state, "sub_lbl"):
-                self.empty_state.sub_lbl.setText("Try adjusting the similarity threshold\nor adding more folders to your library.")
+            self.empty_state.configure(
+                "⌕",
+                "No Matches Found",
+                "Try adjusting the similarity threshold or adding more folders.",
+                "Adjust Settings",
+            )
             self.stack.setCurrentWidget(self.empty_state)
             return
             
@@ -143,6 +166,7 @@ class SearchArea(QWidget):
         self.populate_timer.start(50) # 50ms stagger
 
     def show_duplicate_groups(self, groups):
+        self.current_mode = "duplicates"
         self.result_list.setViewMode(QListWidget.ViewMode.ListMode)
         self.result_list.setIconSize(QSize(0, 0))
         self.result_list.clear()
@@ -152,9 +176,12 @@ class SearchArea(QWidget):
 
         if not groups:
             self.lbl_results_title.setText("No Duplicates Found")
-            self.empty_state.msg_lbl.setText("No Duplicates Found")
-            if hasattr(self.empty_state, "sub_lbl"):
-                self.empty_state.sub_lbl.setText("Indexed images in your added folders are unique.")
+            self.empty_state.configure(
+                "▣",
+                "No Duplicates Found",
+                "Indexed images in your added folders are unique.",
+                "Index Again",
+            )
             self.stack.setCurrentWidget(self.empty_state)
             return
 
@@ -168,6 +195,7 @@ class SearchArea(QWidget):
             item = QListWidgetItem()
             item.setData(Qt.ItemDataRole.UserRole, paths)
             widget = DuplicateGroupWidget(group_number, paths)
+            widget.reveal_requested.connect(self.result_double_clicked.emit)
             item.setSizeHint(widget.sizeHint())
             self.result_list.addItem(item)
             self.result_list.setItemWidget(item, widget)
@@ -243,8 +271,11 @@ class SearchArea(QWidget):
         from PyQt6.QtGui import QAction, QGuiApplication, QPixmap
         
         menu = QMenu()
-        reveal_action = menu.addAction("Reveal in Finder")
+        reveal_action = menu.addAction("Reveal First Image in Finder")
         open_action = menu.addAction("Open Image")
+        reveal_group_action = None
+        if len(paths) > 1:
+            reveal_group_action = menu.addAction("Reveal Group Folder")
         copy_path_action = menu.addAction("Copy Paths" if len(paths) > 1 else "Copy Path")
         copy_image_action = menu.addAction("Copy Image")
         
@@ -256,6 +287,8 @@ class SearchArea(QWidget):
             from PyQt6.QtGui import QDesktopServices
             from PyQt6.QtCore import QUrl
             QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+        elif reveal_group_action is not None and action == reveal_group_action:
+            self.result_double_clicked.emit(path)
         elif action == copy_path_action:
             clipboard = QGuiApplication.clipboard()
             clipboard.setText("\n".join(paths))
@@ -266,11 +299,39 @@ class SearchArea(QWidget):
                 clipboard.setImage(pixmap.toImage())
 
     def clear(self):
+        self.current_mode = "search"
         self.drop_zone.clear_preview()
         if hasattr(self, 'populate_timer') and self.populate_timer.isActive():
             self.populate_timer.stop()
         self.result_list.clear()
         self.result_list.setViewMode(QListWidget.ViewMode.IconMode)
         self.result_list.setIconSize(QSize(120, 140))
-        self.lbl_results_title.setText("Matches")
+        self.lbl_results_title.setText("Search Matches")
         self.stack.setCurrentWidget(self.result_list)
+
+    def show_index_empty_state(self):
+        self.current_mode = "library"
+        self.lbl_results_title.setText("Library")
+        self.empty_state.configure(
+            "+",
+            "No Folders Added",
+            "Add a folder to build your local image index.",
+            "Add Folder",
+        )
+        self.stack.setCurrentWidget(self.empty_state)
+
+    def show_search_ready_state(self):
+        self.current_mode = "search"
+        self.lbl_results_title.setText("Search Matches")
+        self.result_list.clear()
+        self.result_list.setViewMode(QListWidget.ViewMode.IconMode)
+        self.result_list.setIconSize(QSize(120, 140))
+        self.stack.setCurrentWidget(self.result_list)
+
+    def on_empty_action_clicked(self):
+        if self.current_mode == "library":
+            self.add_folder_requested.emit()
+        elif self.current_mode == "duplicates":
+            self.index_requested.emit()
+        elif self.current_mode == "search":
+            self.settings_requested.emit()

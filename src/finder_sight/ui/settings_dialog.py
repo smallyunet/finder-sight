@@ -3,7 +3,8 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
     QSpinBox, QPushButton, QGroupBox, QFormLayout, QSlider
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtGui import QDesktopServices
 
 from src.finder_sight.constants import DEFAULT_MAX_RESULTS, DEFAULT_SIMILARITY_THRESHOLD
 
@@ -21,6 +22,8 @@ class SettingsDialog(QDialog):
         settings = current_settings or {}
         self.similarity_threshold = settings.get('similarity_threshold', DEFAULT_SIMILARITY_THRESHOLD)
         self.max_results = settings.get('max_results', DEFAULT_MAX_RESULTS)
+        self.available_update = None
+        self.downloaded_update_path = None
         
         self.init_ui()
     
@@ -86,7 +89,7 @@ class SettingsDialog(QDialog):
         # Update Check
         update_layout = QHBoxLayout()
         self.btn_check_update = QPushButton("Check for Updates")
-        self.btn_check_update.clicked.connect(self.check_updates)
+        self.btn_check_update.clicked.connect(self.on_update_button_clicked)
         self.lbl_update_status = QLabel("")
         self.lbl_update_status.setStyleSheet("color: #86868b; font-size: 11px;")
         
@@ -113,7 +116,16 @@ class SettingsDialog(QDialog):
         
         layout.addLayout(button_layout)
         
+    def on_update_button_clicked(self):
+        if self.downloaded_update_path:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(self.downloaded_update_path))
+        elif self.available_update:
+            self.download_update(self.available_update)
+        else:
+            self.check_updates()
+
     def check_updates(self):
+        self.downloaded_update_path = None
         self.btn_check_update.setEnabled(False)
         self.lbl_update_status.setText("Checking...")
         
@@ -122,24 +134,50 @@ class SettingsDialog(QDialog):
         self.update_thread.finished.connect(self.on_update_checked)
         self.update_thread.start()
         
-    def on_update_checked(self, available, latest, url):
+    def on_update_checked(self, available, latest, url, error=""):
         self.btn_check_update.setEnabled(True)
         if available:
-            self.lbl_update_status.setText(f"New version {latest} available!")
+            self.available_update = latest
+            self.btn_check_update.setText("Download Update")
             self.lbl_update_status.setStyleSheet("color: #007AFF; font-weight: bold;")
-            # Maybe change button text or add a link
-            from PyQt6.QtGui import QDesktopServices
-            from PyQt6.QtCore import QUrl
-            # We can't easily change the button action dynamically without disconnection
-            # For simplicity, open URL if user clicks 'Check' again? No that's confusing.
-            # Let's just open the URL immediately? Or show a dialog?
-            # User asked for info on interface, not necessarily popup.
-            # But let's keep it simple: Text link.
-            self.lbl_update_status.setText(f"<a href='{url}'>New version {latest} available!</a>")
-            self.lbl_update_status.setOpenExternalLinks(True)
+            self.lbl_update_status.setText(f"New version {latest} available.")
+        elif error:
+            self.lbl_update_status.setText(f"Update check failed: {error}")
+            self.lbl_update_status.setStyleSheet("color: #d70015;")
         else:
             self.lbl_update_status.setText("You are up to date.")
             self.lbl_update_status.setStyleSheet("color: #34C759;")
+
+    def download_update(self, latest):
+        self.btn_check_update.setEnabled(False)
+        self.lbl_update_status.setText("Downloading...")
+
+        from src.finder_sight.utils.updater_thread import UpdateDownloadThread
+        self.download_thread = UpdateDownloadThread(latest, self)
+        self.download_thread.progress.connect(self.on_download_progress)
+        self.download_thread.finished.connect(self.on_download_finished)
+        self.download_thread.error.connect(self.on_download_error)
+        self.download_thread.start()
+
+    def on_download_progress(self, downloaded, total):
+        if total:
+            pct = int(downloaded / total * 100)
+            self.lbl_update_status.setText(f"Downloading... {pct}%")
+        else:
+            self.lbl_update_status.setText("Downloading...")
+
+    def on_download_finished(self, dmg_path):
+        self.btn_check_update.setEnabled(True)
+        self.btn_check_update.setText("Open Installer")
+        self.available_update = None
+        self.downloaded_update_path = dmg_path
+        self.lbl_update_status.setText("Downloaded. Opening installer...")
+        QDesktopServices.openUrl(QUrl.fromLocalFile(dmg_path))
+
+    def on_download_error(self, error):
+        self.btn_check_update.setEnabled(True)
+        self.lbl_update_status.setText(f"Download failed: {error}")
+        self.lbl_update_status.setStyleSheet("color: #d70015;")
 
     def get_settings(self) -> dict:
         """Return the current settings from the dialog."""

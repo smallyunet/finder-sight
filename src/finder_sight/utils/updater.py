@@ -1,3 +1,4 @@
+import os
 import urllib.request
 import json
 import ssl
@@ -23,7 +24,7 @@ def parse_version(version_str: str) -> Tuple[int, ...]:
         
     return tuple(int(p) for p in numeric_parts)
 
-def check_for_updates(current_version: str, repo_owner: str, repo_name: str) -> Tuple[bool, str, str]:
+def check_for_updates(current_version: str, repo_owner: str, repo_name: str) -> Tuple[bool, str, str, Optional[str]]:
     """
     Check for updates on GitHub.
     
@@ -83,3 +84,49 @@ def check_for_updates(current_version: str, repo_owner: str, repo_name: str) -> 
         return False, current_version, "", error_msg
         
     return False, latest_tag if 'latest_tag' in locals() else current_version, html_url if 'html_url' in locals() else "", None
+
+
+def get_release_asset_download_url(
+    repo_owner: str,
+    repo_name: str,
+    tag_name: str,
+    asset_name: str = "FinderSight-macOS.dmg",
+) -> Tuple[str, int]:
+    api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases/tags/{tag_name}"
+    ctx = ssl.create_default_context()
+    req = urllib.request.Request(api_url, headers={'User-Agent': 'FinderSight-Updater'})
+
+    with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
+        if response.status != 200:
+            raise RuntimeError(f"GitHub API returned status {response.status}")
+        data: Dict[str, Any] = json.loads(response.read().decode('utf-8'))
+
+    for asset in data.get("assets", []):
+        if asset.get("name") == asset_name:
+            return asset["browser_download_url"], int(asset.get("size") or 0)
+
+    for asset in data.get("assets", []):
+        name = asset.get("name", "")
+        if name.lower().endswith(".dmg"):
+            return asset["browser_download_url"], int(asset.get("size") or 0)
+
+    raise RuntimeError(f"No DMG asset found for {tag_name}")
+
+
+def download_update_asset(download_url: str, destination_path: str, progress_callback=None) -> None:
+    os.makedirs(os.path.dirname(destination_path), exist_ok=True)
+    ctx = ssl.create_default_context()
+    req = urllib.request.Request(download_url, headers={'User-Agent': 'FinderSight-Updater'})
+
+    with urllib.request.urlopen(req, context=ctx, timeout=30) as response:
+        total = int(response.headers.get("Content-Length") or 0)
+        downloaded = 0
+        with open(destination_path, "wb") as f:
+            while True:
+                chunk = response.read(1024 * 256)
+                if not chunk:
+                    break
+                f.write(chunk)
+                downloaded += len(chunk)
+                if progress_callback:
+                    progress_callback(downloaded, total)

@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QListWidget, QListWidgetItem, 
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QListWidget, QListWidgetItem,
                              QPushButton, QHBoxLayout, QLabel, QFrame, QStyle, QProgressBar)
 from PyQt6.QtCore import Qt, pyqtSignal, QSize
 from PyQt6.QtGui import QIcon
@@ -37,6 +37,19 @@ class FolderItemWidget(QWidget):
         text_layout.addWidget(self.lbl_path)
         
         main_layout.addLayout(text_layout, 1)
+
+
+class SidebarActionButton(QPushButton):
+    def __init__(self, icon_text, label, tooltip):
+        super().__init__(f"{icon_text}  {label}")
+        self.setToolTip(tooltip)
+        self.setMinimumHeight(28)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setStyleSheet(
+            "QPushButton { text-align: left; padding: 4px 8px; font-size: 12px; "
+            "font-weight: 500; color: #1d1d1f; }"
+        )
+
 
 class Sidebar(QWidget):
     add_folder_clicked = pyqtSignal()
@@ -78,15 +91,15 @@ class Sidebar(QWidget):
         # Footer (Status + Actions)
         footer = QWidget()
         footer.setObjectName("SidebarFooter")
-        footer.setMinimumHeight(80)  # Ensure footer is always visible
+        footer.setMinimumHeight(172)
         footer_layout = QVBoxLayout(footer)
-        footer_layout.setContentsMargins(0, 8, 0, 8)
-        footer_layout.setSpacing(6)
+        footer_layout.setContentsMargins(12, 8, 12, 10)
+        footer_layout.setSpacing(8)
         
         # 1. Status Row (Vertical for Progress Bar)
         status_row = QWidget()
         status_layout = QVBoxLayout(status_row)
-        status_layout.setContentsMargins(16, 0, 16, 0)
+        status_layout.setContentsMargins(0, 0, 0, 0)
         status_layout.setSpacing(4)
         
         self.lbl_status = QLabel("Ready")
@@ -112,71 +125,53 @@ class Sidebar(QWidget):
         
         footer_layout.addWidget(status_row)
         
-        # 2. Actions Row
-        actions_bar = QWidget()
-        actions_bar.setFixedHeight(32)
-        actions_layout = QHBoxLayout(actions_bar)
-        actions_layout.setContentsMargins(12, 0, 12, 0)
-        actions_layout.setSpacing(8)
-        
-        self.btn_add = QPushButton("+")
-        self.btn_add.setToolTip("Add Folder")
-        self.btn_add.setFixedSize(24, 24)
-        self.btn_add.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_add.setStyleSheet("QPushButton { color: #1d1d1f; font-weight: bold; padding: 0px; font-size: 16px; }")
+        library_label = QLabel("LIBRARY")
+        library_label.setStyleSheet("font-size: 10px; font-weight: 600; color: #86868b;")
+        footer_layout.addWidget(library_label)
+
+        library_actions = QHBoxLayout()
+        library_actions.setContentsMargins(0, 0, 0, 0)
+        library_actions.setSpacing(8)
+
+        self.btn_add = SidebarActionButton("+", "Add", "Add Folder")
         self.btn_add.clicked.connect(self.add_folder_clicked)
-        
-        self.btn_remove = QPushButton("−")
-        self.btn_remove.setToolTip("Remove Folder")
-        self.btn_remove.setFixedSize(24, 24)
-        self.btn_remove.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_remove.setStyleSheet("QPushButton { color: #1d1d1f; font-weight: bold; padding: 0px; font-size: 16px; }")
+
+        self.btn_remove = SidebarActionButton("-", "Remove", "Remove Selected Folder")
         self.btn_remove.clicked.connect(self.remove_folder_clicked)
-        
-        # Spacer
-        line = QFrame()
-        line.setFrameShape(QFrame.Shape.VLine)
-        line.setFrameShadow(QFrame.Shadow.Sunken)
-        line.setStyleSheet("color: #c0c0c0;")
-        
-        self.btn_refresh = QPushButton("⟳")
-        self.btn_refresh.setToolTip("Index Now")
-        self.btn_refresh.setFixedSize(24, 24)
-        self.btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_refresh.setStyleSheet("QPushButton { color: #1d1d1f; padding: 0px; font-size: 16px; min-height: 20px }")
+
+        library_actions.addWidget(self.btn_add)
+        library_actions.addWidget(self.btn_remove)
+        footer_layout.addLayout(library_actions)
+
+        index_label = QLabel("INDEX")
+        index_label.setStyleSheet("font-size: 10px; font-weight: 600; color: #86868b;")
+        footer_layout.addWidget(index_label)
+
+        index_actions = QVBoxLayout()
+        index_actions.setContentsMargins(0, 0, 0, 0)
+        index_actions.setSpacing(6)
+
+        self.btn_refresh = SidebarActionButton("↻", "Index Now", "Scan added folders for new images")
         self.btn_refresh.clicked.connect(self.refresh_clicked)
 
-        self.btn_duplicates = QPushButton("⧉")
-        self.btn_duplicates.setToolTip("Find Duplicate Images")
-        self.btn_duplicates.setFixedSize(24, 24)
-        self.btn_duplicates.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_duplicates.setStyleSheet("QPushButton { color: #1d1d1f; padding: 0px; font-size: 15px; min-height: 20px }")
+        self.btn_duplicates = SidebarActionButton("▣", "Find Duplicates", "Find duplicate images in indexed folders")
         self.btn_duplicates.clicked.connect(self.duplicates_clicked)
-        
-        self.btn_clear = QPushButton("⌫")
-        self.btn_clear.setToolTip("Clear Index")
-        self.btn_clear.setFixedSize(24, 24)
-        self.btn_clear.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_clear.setStyleSheet("QPushButton { color: #d70015; padding: 0px; font-size: 16px; min-height: 20px }")
-        self.btn_clear.clicked.connect(self.clear_clicked)
-        
-        self.btn_info = QPushButton("ⓘ")
-        self.btn_info.setToolTip("Index Information")
-        self.btn_info.setFixedSize(24, 24)
-        self.btn_info.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_info.setStyleSheet("QPushButton { color: #007AFF; padding: 0px; font-size: 16px; min-height: 20px }")
+
+        self.btn_info = SidebarActionButton("i", "Index Info", "Show index information")
         self.btn_info.clicked.connect(self.info_clicked)
-        
-        actions_layout.addWidget(self.btn_add)
-        actions_layout.addWidget(self.btn_remove)
-        actions_layout.addWidget(line)
-        actions_layout.addWidget(self.btn_refresh)
-        actions_layout.addWidget(self.btn_duplicates)
-        actions_layout.addWidget(self.btn_clear)
-        actions_layout.addWidget(self.btn_info)
-        actions_layout.addStretch()
-        
-        footer_layout.addWidget(actions_bar)
+
+        self.btn_clear = SidebarActionButton("!", "Clear Index", "Clear the local image index")
+        self.btn_clear.setStyleSheet(
+            "QPushButton { text-align: left; padding: 4px 8px; font-size: 12px; "
+            "font-weight: 500; color: #d70015; }"
+        )
+        self.btn_clear.clicked.connect(self.clear_clicked)
+
+        index_actions.addWidget(self.btn_refresh)
+        index_actions.addWidget(self.btn_duplicates)
+        index_actions.addWidget(self.btn_info)
+        index_actions.addWidget(self.btn_clear)
+        footer_layout.addLayout(index_actions)
         layout.addWidget(footer, 0)
         
     def add_folder(self, path):

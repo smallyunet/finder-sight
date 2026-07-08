@@ -3,8 +3,9 @@ import os
 import json
 import subprocess
 import io
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QSplitter, QFileDialog, QMessageBox, QMenu)
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
+                             QHBoxLayout, QSplitter, QFileDialog, QMessageBox, QMenu,
+                             QProgressDialog)
 from PyQt6.QtCore import Qt, QBuffer, QIODevice, QSize
 from PyQt6.QtGui import QAction, QKeySequence, QPixmap, QDesktopServices
 from PyQt6.QtCore import QUrl, QThread, pyqtSignal
@@ -25,7 +26,7 @@ from src.finder_sight.ui.search_area import SearchArea
 from src.finder_sight.ui.settings_dialog import SettingsDialog
 from src.finder_sight.utils.logger import logger
 from src.finder_sight.utils.resource_helper import get_resource_path
-from src.finder_sight.utils.updater_thread import UpdateCheckThread
+from src.finder_sight.utils.updater_thread import UpdateCheckThread, UpdateDownloadThread
 from src.finder_sight import __version__ as APP_VERSION
 
 class ImageFinderApp(QMainWindow):
@@ -43,6 +44,8 @@ class ImageFinderApp(QMainWindow):
         self.search_thread = None
         self.duplicate_finder_thread = None
         self.index_loader_thread = None
+        self.update_download_thread = None
+        self.update_progress_dialog = None
         self.indexing_cancelled = False
         
         # Settings
@@ -90,6 +93,9 @@ class ImageFinderApp(QMainWindow):
         self.search_area.image_dropped.connect(self.search_image)
         self.search_area.image_pasted.connect(lambda img: self.search_image(image_data=img))
         self.search_area.result_double_clicked.connect(self.reveal_in_finder)
+        self.search_area.add_folder_requested.connect(self.add_directory)
+        self.search_area.index_requested.connect(self.start_indexing)
+        self.search_area.settings_requested.connect(self.show_settings)
         self.search_area.drop_zone.cleared.connect(self.cancel_search)
         
         # Set initial splitter sizes (Sidebar ~250px, Rest for Content)
@@ -141,6 +147,8 @@ class ImageFinderApp(QMainWindow):
         self.directories.remove(path)
         self.sidebar.remove_selected_folder()
         self.save_config()
+        if not self.directories:
+            self.search_area.show_index_empty_state()
         # Does not auto-reindex, but we should probably clear entries from that dir? 
         # For now, just leave it until next re-index or clear.
 
@@ -154,6 +162,8 @@ class ImageFinderApp(QMainWindow):
             
         self.indexing_cancelled = False
         self.sidebar.set_status("Indexing...", is_indexing=True)
+        if not self.image_index:
+            self.search_area.set_results_loading("Indexing library...")
         
         self.indexer_thread = IndexerThread(self.directories, self.image_index, self.image_mtimes)
         self.indexer_thread.progress_update.connect(self.update_indexing_progress)
@@ -192,6 +202,8 @@ class ImageFinderApp(QMainWindow):
         
         status_msg = "Indexing cancelled." if self.indexing_cancelled else "Ready"
         self.sidebar.set_status(status_msg, is_indexing=False)
+        if self.search_area.lbl_results_title.text() == "Indexing library...":
+            self.search_area.show_search_ready_state()
         
         if not self.indexing_cancelled:
             logger.info(f"Indexing finished: {len(index_data)} new images")
@@ -367,6 +379,8 @@ class ImageFinderApp(QMainWindow):
                         self.sidebar.add_folder(d)
             except Exception as e:
                 logger.error(f"Failed to load config: {e}")
+        if not self.directories:
+            self.search_area.show_index_empty_state()
 
     def create_menu_bar(self):
         menu_bar = self.menuBar()
@@ -465,8 +479,64 @@ class ImageFinderApp(QMainWindow):
             )
             
             if reply == QMessageBox.StandardButton.Yes:
-                QDesktopServices.openUrl(QUrl(url))
+                self.download_update(latest)
         elif error:
              QMessageBox.warning(self, "Update Check Failed", f"Failed to check for updates:\n{error}")
         else:
              QMessageBox.information(self, "Up to Date", f"You are using the latest version ({APP_VERSION}).")
+
+    def download_update(self, latest):
+        if self.update_download_thread and self.update_download_thread.isRunning():
+            return
+
+        self.sidebar.set_status(f"Downloading {latest}...")
+        self.update_progress_dialog = QProgressDialog(
+            f"Downloading Finder Sight {latest}...",
+            "Cancel",
+            0,
+            100,
+            self,
+        )
+        self.update_progress_dialog.setWindowTitle("Downloading Update")
+        self.update_progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        self.update_progress_dialog.setMinimumDuration(0)
+
+        self.update_download_thread = UpdateDownloadThread(latest, self)
+        self.update_download_thread.progress.connect(self.on_update_download_progress)
+        self.update_download_thread.finished.connect(self.on_update_download_finished)
+        self.update_download_thread.error.connect(self.on_update_download_error)
+        self.update_progress_dialog.canceled.connect(self.update_download_thread.requestInterruption)
+        self.update_download_thread.start()
+
+    def on_update_download_progress(self, downloaded, total):
+        if not self.update_progress_dialog:
+            return
+        if total > 0:
+            self.update_progress_dialog.setMaximum(total)
+            self.update_progress_dialog.setValue(downloaded)
+        else:
+            self.update_progress_dialog.setMaximum(0)
+
+    def on_update_download_finished(self, dmg_path):
+        self.sidebar.set_status("Ready")
+        if self.update_progress_dialog:
+            self.update_progress_dialog.close()
+            self.update_progress_dialog = None
+        self.update_download_thread = None
+
+        reply = QMessageBox.question(
+            self,
+            "Update Downloaded",
+            "The update has been downloaded. Open the installer now?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(dmg_path))
+
+    def on_update_download_error(self, error):
+        self.sidebar.set_status("Update download failed")
+        if self.update_progress_dialog:
+            self.update_progress_dialog.close()
+            self.update_progress_dialog = None
+        self.update_download_thread = None
+        QMessageBox.warning(self, "Update Download Failed", error)

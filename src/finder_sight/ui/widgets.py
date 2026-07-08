@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QLabel, QWidget, QHBoxLayout, QVBoxLayout, QFrame, QSizePolicy, QStyle, QStyleOption, QPushButton, QGraphicsOpacityEffect
-from PyQt6.QtCore import pyqtSignal, Qt, QSize, QPropertyAnimation, QEasingCurve, QTimer
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMouseEvent, QPixmap, QPainter
+from PyQt6.QtWidgets import QLabel, QWidget, QHBoxLayout, QVBoxLayout, QFrame, QSizePolicy, QStyle, QStyleOption, QPushButton, QGraphicsOpacityEffect, QMenu
+from PyQt6.QtCore import pyqtSignal, Qt, QSize, QPropertyAnimation, QEasingCurve, QTimer, QUrl
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMouseEvent, QPixmap, QPainter, QDesktopServices, QGuiApplication
 import os
 from src.finder_sight.constants import MAX_HASH_DIST
 
@@ -71,7 +71,7 @@ class DropLabel(QLabel):
     def _update_search_text(self):
         self.search_dots = (self.search_dots + 1) % 4
         dots = "." * self.search_dots
-        self.setText(f"🔍 Searching{dots}")
+        self.setText(f"Searching{dots}")
 
     def on_close_clicked(self):
         self.clear_preview()
@@ -154,7 +154,7 @@ class DropLabel(QLabel):
         if searching:
             self.clear() # Clear current display (text or pixmap)
             self.search_dots = 0
-            self.setText("🔍 Searching")
+            self.setText("Searching")
             self.search_timer.start(400)
             self.setProperty("state", "searching")
             self.btn_close.show() # keep showing to allow cancel/clear
@@ -258,51 +258,95 @@ class ResultWidget(QWidget):
         self.anim.start()
 
 
+class DuplicateImageWidget(QWidget):
+    reveal_requested = pyqtSignal(str)
+
+    def __init__(self, path: str, role_text: str):
+        super().__init__()
+        self.path = path
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip(path)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+
+        thumb = QLabel()
+        thumb.setObjectName("ResultThumbnail")
+        thumb.setFixedSize(86, 86)
+        thumb.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        pixmap = QPixmap(path)
+        if not pixmap.isNull():
+            thumb.setPixmap(
+                pixmap.scaled(
+                    QSize(80, 80),
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+            )
+        layout.addWidget(thumb, 0, Qt.AlignmentFlag.AlignCenter)
+
+        name = QLabel(os.path.basename(path))
+        name.setFixedWidth(92)
+        name.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        name.setObjectName("ResultName")
+        if len(name.text()) > 13:
+            name.setText(name.text()[:10] + "...")
+        layout.addWidget(name)
+
+        role = QLabel(role_text)
+        role.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        role.setStyleSheet("font-size: 10px; color: #86868b;")
+        layout.addWidget(role)
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.reveal_requested.emit(self.path)
+        super().mouseDoubleClickEvent(event)
+
+    def show_context_menu(self, position):
+        menu = QMenu()
+        reveal_action = menu.addAction("Reveal in Finder")
+        open_action = menu.addAction("Open Image")
+        copy_path_action = menu.addAction("Copy Path")
+        action = menu.exec(self.mapToGlobal(position))
+
+        if action == reveal_action:
+            self.reveal_requested.emit(self.path)
+        elif action == open_action:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(self.path))
+        elif action == copy_path_action:
+            QGuiApplication.clipboard().setText(self.path)
+
+
 class DuplicateGroupWidget(QWidget):
+    reveal_requested = pyqtSignal(str)
+
     def __init__(self, group_number: int, paths: list[str]):
         super().__init__()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 8, 10, 10)
         layout.setSpacing(8)
 
-        title = QLabel(f"Group {group_number} · {len(paths)} duplicate images")
+        title = QLabel(f"Group {group_number} · {len(paths)} images with the same visual hash")
         title.setStyleSheet("font-size: 13px; font-weight: 600; color: #1d1d1f;")
         layout.addWidget(title)
+
+        folder_hint = QLabel(os.path.dirname(paths[0]) if paths else "")
+        folder_hint.setStyleSheet("font-size: 11px; color: #86868b;")
+        folder_hint.setWordWrap(True)
+        layout.addWidget(folder_hint)
 
         thumbs_layout = QHBoxLayout()
         thumbs_layout.setContentsMargins(0, 0, 0, 0)
         thumbs_layout.setSpacing(10)
 
-        for path in paths[:8]:
-            item = QWidget()
-            item_layout = QVBoxLayout(item)
-            item_layout.setContentsMargins(0, 0, 0, 0)
-            item_layout.setSpacing(4)
-
-            thumb = QLabel()
-            thumb.setObjectName("ResultThumbnail")
-            thumb.setFixedSize(78, 78)
-            thumb.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            pixmap = QPixmap(path)
-            if not pixmap.isNull():
-                thumb.setPixmap(
-                    pixmap.scaled(
-                        QSize(72, 72),
-                        Qt.AspectRatioMode.KeepAspectRatio,
-                        Qt.TransformationMode.SmoothTransformation,
-                    )
-                )
-            item_layout.addWidget(thumb, 0, Qt.AlignmentFlag.AlignCenter)
-
-            name = QLabel(os.path.basename(path))
-            name.setFixedWidth(82)
-            name.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            name.setObjectName("ResultName")
-            name.setToolTip(path)
-            if len(name.text()) > 12:
-                name.setText(name.text()[:9] + "...")
-            item_layout.addWidget(name)
-
+        for index, path in enumerate(paths[:8]):
+            role_text = "reference" if index == 0 else "duplicate"
+            item = DuplicateImageWidget(path, role_text)
+            item.reveal_requested.connect(self.reveal_requested.emit)
             thumbs_layout.addWidget(item)
 
         if len(paths) > 8:
