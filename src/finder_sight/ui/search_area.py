@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QListWidget, QListWidgetItem,
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QTimer
 from PyQt6.QtGui import QPixmap, QImageReader
 import os
-from src.finder_sight.ui.widgets import DropLabel, ResultWidget
+from src.finder_sight.ui.widgets import DropLabel, ResultWidget, DuplicateGroupWidget
 from src.finder_sight.constants import THUMBNAIL_SIZE, MAX_HASH_DIST
 
 class EmptyStateWidget(QWidget):
@@ -108,10 +108,19 @@ class SearchArea(QWidget):
             self.result_list.clear()
             self.stack.setCurrentWidget(self.result_list)
 
+    def set_results_loading(self, title):
+        if hasattr(self, 'populate_timer') and self.populate_timer.isActive():
+            self.populate_timer.stop()
+        self.result_list.clear()
+        self.lbl_results_title.setText(title)
+        self.stack.setCurrentWidget(self.result_list)
+
     def show_results(self, results):
         """
         results: list of (path, distance) tuples
         """
+        self.result_list.setViewMode(QListWidget.ViewMode.IconMode)
+        self.result_list.setIconSize(QSize(120, 140))
         self.result_list.clear()
         
         if hasattr(self, 'populate_timer') and self.populate_timer.isActive():
@@ -119,6 +128,9 @@ class SearchArea(QWidget):
         
         if not results:
             self.lbl_results_title.setText("No Matches Found")
+            self.empty_state.msg_lbl.setText("No Matches Found")
+            if hasattr(self.empty_state, "sub_lbl"):
+                self.empty_state.sub_lbl.setText("Try adjusting the similarity threshold\nor adding more folders to your library.")
             self.stack.setCurrentWidget(self.empty_state)
             return
             
@@ -129,6 +141,36 @@ class SearchArea(QWidget):
         self.populate_timer = QTimer(self)
         self.populate_timer.timeout.connect(self._add_next_result)
         self.populate_timer.start(50) # 50ms stagger
+
+    def show_duplicate_groups(self, groups):
+        self.result_list.setViewMode(QListWidget.ViewMode.ListMode)
+        self.result_list.setIconSize(QSize(0, 0))
+        self.result_list.clear()
+
+        if hasattr(self, 'populate_timer') and self.populate_timer.isActive():
+            self.populate_timer.stop()
+
+        if not groups:
+            self.lbl_results_title.setText("No Duplicates Found")
+            self.empty_state.msg_lbl.setText("No Duplicates Found")
+            if hasattr(self.empty_state, "sub_lbl"):
+                self.empty_state.sub_lbl.setText("Indexed images in your added folders are unique.")
+            self.stack.setCurrentWidget(self.empty_state)
+            return
+
+        self.stack.setCurrentWidget(self.result_list)
+        total_images = sum(len(group) for group in groups)
+        self.lbl_results_title.setText(
+            f"Found {len(groups)} Duplicate Groups · {total_images} Images"
+        )
+
+        for group_number, paths in enumerate(groups, start=1):
+            item = QListWidgetItem()
+            item.setData(Qt.ItemDataRole.UserRole, paths)
+            widget = DuplicateGroupWidget(group_number, paths)
+            item.setSizeHint(widget.sizeHint())
+            self.result_list.addItem(item)
+            self.result_list.setItemWidget(item, widget)
         
     def _add_next_result(self):
         if not self.pending_results:
@@ -167,7 +209,8 @@ class SearchArea(QWidget):
         self.result_list.setItemWidget(item, widget)
 
     def on_item_double_clicked(self, item):
-        path = item.data(Qt.ItemDataRole.UserRole)
+        data = item.data(Qt.ItemDataRole.UserRole)
+        path = data[0] if isinstance(data, list) and data else data
         if path:
             self.result_double_clicked.emit(path)
 
@@ -190,7 +233,9 @@ class SearchArea(QWidget):
         if not item:
             return
             
-        path = item.data(Qt.ItemDataRole.UserRole)
+        data = item.data(Qt.ItemDataRole.UserRole)
+        paths = data if isinstance(data, list) else [data]
+        path = paths[0] if paths else None
         if not path or not os.path.exists(path):
             return
             
@@ -200,7 +245,7 @@ class SearchArea(QWidget):
         menu = QMenu()
         reveal_action = menu.addAction("Reveal in Finder")
         open_action = menu.addAction("Open Image")
-        copy_path_action = menu.addAction("Copy Path")
+        copy_path_action = menu.addAction("Copy Paths" if len(paths) > 1 else "Copy Path")
         copy_image_action = menu.addAction("Copy Image")
         
         action = menu.exec(self.result_list.viewport().mapToGlobal(position))
@@ -213,7 +258,7 @@ class SearchArea(QWidget):
             QDesktopServices.openUrl(QUrl.fromLocalFile(path))
         elif action == copy_path_action:
             clipboard = QGuiApplication.clipboard()
-            clipboard.setText(path)
+            clipboard.setText("\n".join(paths))
         elif action == copy_image_action:
             clipboard = QGuiApplication.clipboard()
             pixmap = QPixmap(path)
@@ -225,5 +270,7 @@ class SearchArea(QWidget):
         if hasattr(self, 'populate_timer') and self.populate_timer.isActive():
             self.populate_timer.stop()
         self.result_list.clear()
+        self.result_list.setViewMode(QListWidget.ViewMode.IconMode)
+        self.result_list.setIconSize(QSize(120, 140))
         self.lbl_results_title.setText("Matches")
         self.stack.setCurrentWidget(self.result_list)

@@ -17,6 +17,7 @@ from src.finder_sight.constants import (
     DEFAULT_SIMILARITY_THRESHOLD, INDEX_VERSION,
     HASH_SIZE, MAX_HASH_DIST
 )
+from src.finder_sight.core.duplicate_finder import DuplicateFinderThread
 from src.finder_sight.core.indexer import IndexerThread, IndexLoaderThread
 from src.finder_sight.core.searcher import SearchThread
 from src.finder_sight.ui.sidebar import Sidebar
@@ -40,6 +41,7 @@ class ImageFinderApp(QMainWindow):
         
         self.indexer_thread = None
         self.search_thread = None
+        self.duplicate_finder_thread = None
         self.index_loader_thread = None
         self.indexing_cancelled = False
         
@@ -76,6 +78,7 @@ class ImageFinderApp(QMainWindow):
         self.sidebar.add_folder_clicked.connect(self.add_directory)
         self.sidebar.remove_folder_clicked.connect(self.remove_directory)
         self.sidebar.refresh_clicked.connect(self.start_indexing)
+        self.sidebar.duplicates_clicked.connect(self.find_duplicates)
         self.sidebar.clear_clicked.connect(self.clear_index)
         self.sidebar.info_clicked.connect(self.show_index_manager)
         
@@ -294,6 +297,33 @@ class ImageFinderApp(QMainWindow):
             self.search_thread.wait()
         self.sidebar.set_status("Ready")
 
+    # --- Duplicate Logic ---
+    def find_duplicates(self):
+        if not self.image_hashes:
+            QMessageBox.warning(self, "Warning", "Index is empty. Add folders and index them first.")
+            return
+
+        if self.duplicate_finder_thread and self.duplicate_finder_thread.isRunning():
+            return
+
+        self.search_area.set_results_loading("Scanning for duplicates...")
+        self.sidebar.set_status("Scanning duplicates...")
+
+        self.duplicate_finder_thread = DuplicateFinderThread(
+            self.image_hashes,
+            self.directories,
+        )
+        self.duplicate_finder_thread.finished.connect(self.on_duplicates_finished)
+        self.duplicate_finder_thread.error.connect(
+            lambda e: QMessageBox.critical(self, "Error", e)
+        )
+        self.duplicate_finder_thread.start()
+
+    def on_duplicates_finished(self, groups):
+        self.search_area.show_duplicate_groups(groups)
+        self.sidebar.set_status("Ready")
+        self.duplicate_finder_thread = None
+
     # --- Utils ---
     def reveal_in_finder(self, path):
         if sys.platform == 'darwin':
@@ -351,6 +381,11 @@ class ImageFinderApp(QMainWindow):
         index_action.setShortcut("Ctrl+I")
         index_action.triggered.connect(self.start_indexing)
         file_menu.addAction(index_action)
+
+        duplicate_action = QAction("Find &Duplicates", self)
+        duplicate_action.setShortcut("Ctrl+D")
+        duplicate_action.triggered.connect(self.find_duplicates)
+        file_menu.addAction(duplicate_action)
         
         clear_action = QAction("Clear Index", self)
         clear_action.triggered.connect(self.clear_index)

@@ -42,6 +42,7 @@ class Sidebar(QWidget):
     add_folder_clicked = pyqtSignal()
     remove_folder_clicked = pyqtSignal()
     refresh_clicked = pyqtSignal()
+    duplicates_clicked = pyqtSignal()
     clear_clicked = pyqtSignal()
     info_clicked = pyqtSignal()
     
@@ -144,6 +145,13 @@ class Sidebar(QWidget):
         self.btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_refresh.setStyleSheet("QPushButton { color: #1d1d1f; padding: 0px; font-size: 16px; min-height: 20px }")
         self.btn_refresh.clicked.connect(self.refresh_clicked)
+
+        self.btn_duplicates = QPushButton("⧉")
+        self.btn_duplicates.setToolTip("Find Duplicate Images")
+        self.btn_duplicates.setFixedSize(24, 24)
+        self.btn_duplicates.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_duplicates.setStyleSheet("QPushButton { color: #1d1d1f; padding: 0px; font-size: 15px; min-height: 20px }")
+        self.btn_duplicates.clicked.connect(self.duplicates_clicked)
         
         self.btn_clear = QPushButton("⌫")
         self.btn_clear.setToolTip("Clear Index")
@@ -163,6 +171,7 @@ class Sidebar(QWidget):
         actions_layout.addWidget(self.btn_remove)
         actions_layout.addWidget(line)
         actions_layout.addWidget(self.btn_refresh)
+        actions_layout.addWidget(self.btn_duplicates)
         actions_layout.addWidget(self.btn_clear)
         actions_layout.addWidget(self.btn_info)
         actions_layout.addStretch()

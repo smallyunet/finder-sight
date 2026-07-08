@@ -256,3 +256,60 @@ class ResultWidget(QWidget):
         self.anim.setEndValue(1.0)
         self.anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
         self.anim.start()
+
+
+class DuplicateGroupWidget(QWidget):
+    def __init__(self, group_number: int, paths: list[str]):
+        super().__init__()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 8, 10, 10)
+        layout.setSpacing(8)
+
+        title = QLabel(f"Group {group_number} · {len(paths)} duplicate images")
+        title.setStyleSheet("font-size: 13px; font-weight: 600; color: #1d1d1f;")
+        layout.addWidget(title)
+
+        thumbs_layout = QHBoxLayout()
+        thumbs_layout.setContentsMargins(0, 0, 0, 0)
+        thumbs_layout.setSpacing(10)
+
+        for path in paths[:8]:
+            item = QWidget()
+            item_layout = QVBoxLayout(item)
+            item_layout.setContentsMargins(0, 0, 0, 0)
+            item_layout.setSpacing(4)
+
+            thumb = QLabel()
+            thumb.setObjectName("ResultThumbnail")
+            thumb.setFixedSize(78, 78)
+            thumb.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            pixmap = QPixmap(path)
+            if not pixmap.isNull():
+                thumb.setPixmap(
+                    pixmap.scaled(
+                        QSize(72, 72),
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                )
+            item_layout.addWidget(thumb, 0, Qt.AlignmentFlag.AlignCenter)
+
+            name = QLabel(os.path.basename(path))
+            name.setFixedWidth(82)
+            name.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            name.setObjectName("ResultName")
+            name.setToolTip(path)
+            if len(name.text()) > 12:
+                name.setText(name.text()[:9] + "...")
+            item_layout.addWidget(name)
+
+            thumbs_layout.addWidget(item)
+
+        if len(paths) > 8:
+            more = QLabel(f"+{len(paths) - 8} more")
+            more.setStyleSheet("font-size: 12px; color: #86868b;")
+            thumbs_layout.addWidget(more)
+
+        thumbs_layout.addStretch()
+        layout.addLayout(thumbs_layout)
+        self.setToolTip("\n".join(paths))
