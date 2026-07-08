@@ -51,10 +51,12 @@ class SearchArea(QWidget):
     add_folder_requested = pyqtSignal()
     index_requested = pyqtSignal()
     settings_requested = pyqtSignal()
+    delete_duplicates_requested = pyqtSignal(list)
     
     def __init__(self):
         super().__init__()
         self.current_mode = "search"
+        self.current_duplicate_groups = []
         self.init_ui()
         
     def init_ui(self):
@@ -85,6 +87,16 @@ class SearchArea(QWidget):
         self.header_layout.addWidget(self.lbl_results_title)
         
         self.header_layout.addStretch()
+
+        self.btn_delete_duplicates = QPushButton("Move Duplicates to Trash")
+        self.btn_delete_duplicates.setToolTip("Move lower-quality duplicates to the system Trash")
+        self.btn_delete_duplicates.setStyleSheet(
+            "QPushButton { color: #d70015; border-color: #ffb3b8; } "
+            "QPushButton:hover { background-color: #ffe5e6; }"
+        )
+        self.btn_delete_duplicates.hide()
+        self.btn_delete_duplicates.clicked.connect(self.on_delete_duplicates_clicked)
+        self.header_layout.addWidget(self.btn_delete_duplicates)
         
         layout.addLayout(self.header_layout)
         
@@ -119,6 +131,8 @@ class SearchArea(QWidget):
             
     def set_searching_state(self, is_searching):
         self.current_mode = "search"
+        self.current_duplicate_groups = []
+        self.btn_delete_duplicates.hide()
         self.drop_zone.set_searching(is_searching)
         if hasattr(self, 'populate_timer') and self.populate_timer.isActive():
             self.populate_timer.stop()
@@ -131,6 +145,7 @@ class SearchArea(QWidget):
         if hasattr(self, 'populate_timer') and self.populate_timer.isActive():
             self.populate_timer.stop()
         self.result_list.clear()
+        self.btn_delete_duplicates.hide()
         self.lbl_results_title.setText(title)
         self.stack.setCurrentWidget(self.result_list)
 
@@ -139,6 +154,8 @@ class SearchArea(QWidget):
         results: list of (path, distance) tuples
         """
         self.current_mode = "search"
+        self.current_duplicate_groups = []
+        self.btn_delete_duplicates.hide()
         self.result_list.setViewMode(QListWidget.ViewMode.IconMode)
         self.result_list.setIconSize(QSize(120, 140))
         self.result_list.clear()
@@ -167,6 +184,7 @@ class SearchArea(QWidget):
 
     def show_duplicate_groups(self, groups):
         self.current_mode = "duplicates"
+        self.current_duplicate_groups = list(groups)
         self.result_list.setViewMode(QListWidget.ViewMode.ListMode)
         self.result_list.setIconSize(QSize(0, 0))
         self.result_list.clear()
@@ -183,6 +201,7 @@ class SearchArea(QWidget):
                 "Index Again",
             )
             self.stack.setCurrentWidget(self.empty_state)
+            self.btn_delete_duplicates.hide()
             return
 
         self.stack.setCurrentWidget(self.result_list)
@@ -190,6 +209,7 @@ class SearchArea(QWidget):
         self.lbl_results_title.setText(
             f"Found {len(groups)} Duplicate Groups · {total_images} Images"
         )
+        self.btn_delete_duplicates.show()
 
         for group_number, paths in enumerate(groups, start=1):
             item = QListWidgetItem()
@@ -300,6 +320,8 @@ class SearchArea(QWidget):
 
     def clear(self):
         self.current_mode = "search"
+        self.current_duplicate_groups = []
+        self.btn_delete_duplicates.hide()
         self.drop_zone.clear_preview()
         if hasattr(self, 'populate_timer') and self.populate_timer.isActive():
             self.populate_timer.stop()
@@ -311,6 +333,8 @@ class SearchArea(QWidget):
 
     def show_index_empty_state(self):
         self.current_mode = "library"
+        self.current_duplicate_groups = []
+        self.btn_delete_duplicates.hide()
         self.lbl_results_title.setText("Library")
         self.empty_state.configure(
             "+",
@@ -322,6 +346,8 @@ class SearchArea(QWidget):
 
     def show_search_ready_state(self):
         self.current_mode = "search"
+        self.current_duplicate_groups = []
+        self.btn_delete_duplicates.hide()
         self.lbl_results_title.setText("Search Matches")
         self.result_list.clear()
         self.result_list.setViewMode(QListWidget.ViewMode.IconMode)
@@ -335,3 +361,7 @@ class SearchArea(QWidget):
             self.index_requested.emit()
         elif self.current_mode == "search":
             self.settings_requested.emit()
+
+    def on_delete_duplicates_clicked(self):
+        if self.current_duplicate_groups:
+            self.delete_duplicates_requested.emit(self.current_duplicate_groups)

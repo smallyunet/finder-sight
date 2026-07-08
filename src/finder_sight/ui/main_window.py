@@ -6,7 +6,7 @@ import io
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QSplitter, QFileDialog, QMessageBox, QMenu,
                              QProgressDialog)
-from PyQt6.QtCore import Qt, QBuffer, QIODevice, QSize
+from PyQt6.QtCore import Qt, QBuffer, QIODevice, QSize, QFile
 from PyQt6.QtGui import QAction, QKeySequence, QPixmap, QDesktopServices
 from PyQt6.QtCore import QUrl, QThread, pyqtSignal
 
@@ -18,7 +18,7 @@ from src.finder_sight.constants import (
     DEFAULT_SIMILARITY_THRESHOLD, INDEX_VERSION,
     HASH_SIZE, MAX_HASH_DIST
 )
-from src.finder_sight.core.duplicate_finder import DuplicateFinderThread
+from src.finder_sight.core.duplicate_finder import DuplicateFinderThread, plan_duplicate_deletions
 from src.finder_sight.core.indexer import IndexerThread, IndexLoaderThread
 from src.finder_sight.core.searcher import SearchThread
 from src.finder_sight.ui.sidebar import Sidebar
@@ -96,6 +96,7 @@ class ImageFinderApp(QMainWindow):
         self.search_area.add_folder_requested.connect(self.add_directory)
         self.search_area.index_requested.connect(self.start_indexing)
         self.search_area.settings_requested.connect(self.show_settings)
+        self.search_area.delete_duplicates_requested.connect(self.delete_duplicate_images)
         self.search_area.drop_zone.cleared.connect(self.cancel_search)
         
         # Set initial splitter sizes (Sidebar ~250px, Rest for Content)
@@ -335,6 +336,70 @@ class ImageFinderApp(QMainWindow):
         self.search_area.show_duplicate_groups(groups)
         self.sidebar.set_status("Ready")
         self.duplicate_finder_thread = None
+
+    def delete_duplicate_images(self, groups):
+        delete_paths, keepers = plan_duplicate_deletions(groups)
+        if not delete_paths:
+            QMessageBox.information(self, "No Duplicates", "There are no duplicate images to move.")
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "Move Duplicates to Trash",
+            (
+                f"Move {len(delete_paths)} lower-quality duplicate images to Trash?\n\n"
+                f"Finder Sight will keep {len(keepers)} best-quality images based on resolution, file size, and format."
+            ),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        moved_paths = []
+        failed_paths = []
+        self.sidebar.set_status("Moving duplicates to Trash...")
+
+        for path in delete_paths:
+            try:
+                result = QFile.moveToTrash(path)
+                success = result[0] if isinstance(result, tuple) else bool(result)
+                if success:
+                    moved_paths.append(path)
+                else:
+                    failed_paths.append(path)
+            except Exception as e:
+                logger.warning(f"Failed to move duplicate to Trash: {path}: {e}")
+                failed_paths.append(path)
+
+        for path in moved_paths:
+            self.image_index.pop(path, None)
+            self.image_hashes.pop(path, None)
+            self.image_mtimes.pop(path, None)
+
+        if moved_paths:
+            self.save_index()
+
+        self.sidebar.set_status("Ready")
+        moved_set = set(moved_paths)
+        remaining_groups = [
+            [path for path in group if path not in moved_set]
+            for group in groups
+        ]
+        remaining_groups = [group for group in remaining_groups if len(group) > 1]
+        self.search_area.show_duplicate_groups(remaining_groups)
+
+        if failed_paths:
+            QMessageBox.warning(
+                self,
+                "Some Files Were Not Moved",
+                f"Moved {len(moved_paths)} files to Trash.\nFailed to move {len(failed_paths)} files."
+            )
+        else:
+            QMessageBox.information(
+                self,
+                "Duplicates Moved",
+                f"Moved {len(moved_paths)} duplicate images to Trash."
+            )
 
     # --- Utils ---
     def reveal_in_finder(self, path):

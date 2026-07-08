@@ -330,7 +330,7 @@ class DuplicateGroupWidget(QWidget):
         layout.setContentsMargins(10, 8, 10, 10)
         layout.setSpacing(8)
 
-        title = QLabel(f"Group {group_number} · {len(paths)} images with the same visual hash")
+        title = QLabel(f"Group {group_number} · keep best, remove {len(paths) - 1}")
         title.setStyleSheet("font-size: 13px; font-weight: 600; color: #1d1d1f;")
         layout.addWidget(title)
 
@@ -344,7 +344,7 @@ class DuplicateGroupWidget(QWidget):
         thumbs_layout.setSpacing(10)
 
         for index, path in enumerate(paths[:8]):
-            role_text = "reference" if index == 0 else "duplicate"
+            role_text = "keep" if index == 0 else "duplicate"
             item = DuplicateImageWidget(path, role_text)
             item.reveal_requested.connect(self.reveal_requested.emit)
             thumbs_layout.addWidget(item)
