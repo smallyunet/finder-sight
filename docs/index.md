@@ -2,64 +2,36 @@
 layout: default
 ---
 
-# Finder Sight 🔍
+# Finder Sight
 
-**Finder Sight** is a local "Reverse Image Search" tool designed specifically for macOS. It helps you quickly locate original high-quality images from your massive local library using a blurred, cropped, or compressed query image.
+Finder Sight is a native macOS app that finds local images using another image as the query.
 
-[User Guide](./guide) | [GitHub Repository](https://github.com/smallyunet/finder-sight)
+[User Guide](./guide) · [GitHub Repository](https://github.com/smallyunet/finder-sight)
 
----
+## Native macOS experience
 
-## ✨ Key Features
+- SwiftUI sidebar, unified toolbar, Settings scene, and system menus
+- Drag and drop, clipboard search, Finder reveal, and native context menus
+- Dark Mode, accent colors, keyboard navigation, and accessibility support
 
-### 1. Privacy First
-All indexing and searching processes run entirely locally. No internet connection is required, and your images are never uploaded to the cloud.
+## Private perceptual search
 
-### 2. Powerful Perceptual Hashing
-Powered by `ImageHash`'s crop-resistant algorithm, Finder Sight can accurately find the original image even if your search query is:
-- ✂️ Cropped
-- 📉 Compressed or Resized
-- 🎨 Slightly Color-Modified
+Finder Sight builds a compact 256-bit perceptual hash for each local image. Search and duplicate detection happen entirely on your Mac; images are never uploaded.
 
-### 3. Seamless Finder Integration
-Once an image is found, simply click "Reveal in Finder" to instantly select and highlight the file in macOS Finder.
+## Quick start
 
-### 4. Simple & Efficient
-- **Drag & Drop**: Drag an image file directly into the window to search.
-- **Clipboard Search**: Copy an image or screenshot, then press `Cmd+V` to search instantly.
+1. Download `FinderSight-macOS.dmg` from the latest GitHub Release.
+2. Drag Finder Sight into Applications.
+3. Add an image folder with `⌘O`.
+4. Drop or paste an image to search.
 
----
-
-## 🚀 Quick Start
-
-### Installation
+## Build from source
 
 ```bash
 git clone https://github.com/smallyunet/finder-sight.git
 cd finder-sight
-pip install -r requirements.txt
+make test
+make dmg
 ```
 
-### Run
-
-```bash
-python run.py
-```
-
----
-
-## 📸 Demo
-
-![Demo Screenshot](assets/screenshot_main.png)
-
-1. **Build Index**: Add folders via the Sidebar ("+") to auto-index your library.
-2. **Search**: Drag & drop an image or paste (`Cmd+V`) a screenshot.
-3. **Get Result**: Double-click any match to reveal it in Finder.
-
----
-
-## 🛠 Tech Stack
-
-- **UI Framework**: PyQt6
-- **Image Processing**: Pillow (PIL)
-- **Core Algorithm**: ImageHash (Perceptual Hashing)
+Requires macOS 13 or later and a Swift 6 toolchain.

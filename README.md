@@ -1,107 +1,63 @@
-# Finder Sight (macOS Image Finder)
+# Finder Sight
 
-A macOS desktop application for "Reverse Image Search" that helps you find local image files using another image as a query.
-
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Python](https://img.shields.io/badge/python-3.9+-blue.svg)
-![Build Status](https://github.com/smallyunet/finder-sight/actions/workflows/ci.yml/badge.svg)
-
-![Finder Sight Demo](docs/assets/screenshot_main.png)
+A native macOS app for finding local images with another image. Finder Sight indexes perceptual hashes on your Mac, then searches them without uploading anything.
 
 ## Features
 
-- **Smart Indexing**: Select directories to scan for images and build a local index.
-- **Visual Search**: Drag and drop an image or paste from clipboard to find the original file.
-- **Perceptual Matching**: Uses Perceptual Hashing (dhash) to find similar images even if they are resized, compressed, or slightly modified.
-- **Finder Integration**: Reveal the found image directly in macOS Finder with a single click.
-- **Privacy Focused**: All processing happens locally on your machine. No images are uploaded to the cloud.
-
-📚 **[Read the Full User Guide](docs/guide.md)** for detailed instructions.
-
-## Download
-
-
-You can download the latest pre-built version of Finder Sight for macOS from the [Releases](https://github.com/smallyunet/finder-sight/releases) page.
-
-
-1. Download the `FinderSight-macOS.dmg` file.
-2. Open the DMG and drag Finder Sight to your Applications folder.
-3. **Note**: Since the app is not signed with an Apple Developer certificate, you may need to right-click the app and select "Open" for the first time.
+- Native SwiftUI and AppKit interface
+- Drag, choose, or paste an image to search
+- Fast 256-bit perceptual hashing and local indexing
+- Finder reveal and native context menus
+- Exact duplicate groups with quality-aware cleanup to Trash
+- Dark Mode, macOS accent colors, keyboard shortcuts, and Settings scene
+- Fully local processing
 
 ## Requirements
 
-- macOS (Recommended for Finder integration)
-- Python 3.9+
-- PyQt6
-- Pillow
-- ImageHash
+- macOS 13 Ventura or later
+- Swift 6 toolchain for development
 
-## Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/smallyunet/finder-sight.git
-   cd finder-sight
-   ```
-
-2. **Create a virtual environment**
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   ```
-
-3. **Install runtime dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-## Usage
-
-1. **Run the application**
-   ```bash
-   python run.py
-   ```
-
-2. **Build Index**
-   - Click the "+" button in the Sidebar to add image folders.
-   - Indexing starts automatically.
-   - Use `File > Index Now` to manually update the index later.
-
-3. **Search**
-   - Drag an image file into the search area.
-   - Or copy an image to your clipboard and press `Cmd+V`.
-
-4. **Locate**
-   - Matching images appear in the results list with similarity scores.
-   - **Double-click** a result to reveal it in Finder.
+The release app is self-contained and does not require Python or third-party frameworks.
 
 ## Development
 
-### Running Tests
-
-This project uses `pytest` for testing.
-
 ```bash
-# Install development dependencies
-pip install -e ".[test]"
+# Run focused core tests
+make test
 
-# Run tests
-pytest tests/
-```
+# Run the app from source
+make run
 
-### Building the macOS App
-
-```bash
-# Install build dependencies
-pip install -e ".[build]"
-
-# Create a clean app bundle in dist/
+# Build a native app bundle
 make build
+
+# Build the release DMG
+make dmg
 ```
 
-### CI/CD
+Standard XCTest coverage is also available through `swift test` on a stable Xcode toolchain.
 
-The project includes a GitHub Actions workflow (`.github/workflows/ci.yml`) that automatically runs tests on every push and pull request to the `main` branch.
+## Keyboard shortcuts
+
+- `⌘O`: Add an image folder
+- `⌘I`: Update the index
+- `⌘D`: Find duplicates
+- `⌘V`: Search the clipboard image
+- `⌘,`: Open Settings
+
+## Data and migration
+
+Finder Sight stores configuration and its native index in:
+
+```text
+~/Library/Application Support/FinderSight/
+```
+
+Version 0.2 reads the folder and search settings from earlier releases. It rebuilds the old Python index once using the new native hashing engine.
+
+## Release
+
+Pushing a `v*` tag runs tests, builds the native `.app`, creates `FinderSight-macOS.dmg`, and attaches it to a GitHub Release.
 
 ## License
 

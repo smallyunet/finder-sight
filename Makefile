@@ -1,21 +1,19 @@
-.PHONY: install install-dev build clean screenshot
+.PHONY: build dmg test clean run
 
-PYTHON := $(shell if [ -x .venv/bin/python ]; then echo .venv/bin/python; else echo python3; fi)
-
-install:
-	$(PYTHON) -m pip install -r requirements.txt
-
-install-dev:
-	$(PYTHON) -m pip install -e ".[test,build]"
+VERSION ?= 0.2.0
 
 build:
-	rm -rf build dist
-	$(PYTHON) tools/sync_version.py
-	$(PYTHON) -m PyInstaller finder_sight.spec
+	bash scripts/build_app.sh $(VERSION)
+
+dmg: build
+	bash scripts/create_dmg.sh
+
+test:
+	bash scripts/test_core.sh
+
+run:
+	swift run FinderSight
 
 clean:
-	rm -rf build dist
-	rm -rf __pycache__
-
-screenshot:
-	pytest tools/capture_screenshots.py
+	swift package clean
+	rm -rf dist
