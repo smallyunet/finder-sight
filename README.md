@@ -10,6 +10,7 @@ A native macOS app for finding local images with another image. Finder Sight ind
 - Finder reveal and native context menus
 - Exact duplicate groups with quality-aware cleanup to Trash
 - Clear separation between true matches and closest fallback results
+- Keyboard-accessible result cards with folder and duplicate-quality details
 - Cancellable indexing with skipped-file reporting
 - Asynchronous, memory-bounded thumbnail loading
 - Dark Mode, macOS accent colors, keyboard shortcuts, and Settings scene

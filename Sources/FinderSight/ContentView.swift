@@ -84,10 +84,15 @@ struct ContentView: View {
             .listStyle(.sidebar)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(model.status)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                HStack(alignment: .firstTextBaseline) {
+                    Text(model.status)
+                        .lineLimit(2)
+                    Spacer()
+                    Text("\(model.records.count.formatted()) images")
+                        .monospacedDigit()
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
                 if model.isWorking {
                     HStack(spacing: 8) {
                         ProgressView(value: model.progress)
@@ -99,7 +104,6 @@ struct ContentView: View {
                     }
                 }
                 HStack {
-                    Text("\(model.records.count.formatted()) images")
                     Spacer()
                     Button(action: model.addDirectory) {
                         Image(systemName: "plus")
@@ -127,7 +131,7 @@ struct ContentView: View {
     private var mainContent: some View {
         VStack(spacing: 18) {
             DropZone()
-                .frame(height: 210)
+                .frame(height: model.queryImage == nil ? 190 : 112)
 
             HStack {
                 Text(sectionTitle)
@@ -143,15 +147,7 @@ struct ContentView: View {
             Group {
                 switch model.mode {
                 case .ready:
-                    EmptyState(
-                        icon: model.config.directories.isEmpty ? "folder.badge.plus" : "photo.on.rectangle.angled",
-                        title: model.config.directories.isEmpty ? "Add an Image Folder" : "Ready to Search",
-                        message: model.config.directories.isEmpty
-                            ? "Choose folders that contain the images you want to search."
-                            : "Drop, paste, or choose an image to find local matches.",
-                        actionTitle: model.config.directories.isEmpty ? "Add Folder" : "Choose Image",
-                        action: model.config.directories.isEmpty ? model.addDirectory : model.selectQueryImage
-                    )
+                    readyContent
                 case .searchResults:
                     SearchResultsGrid()
                 case .duplicates:
@@ -162,6 +158,25 @@ struct ContentView: View {
         }
         .padding(24)
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    @ViewBuilder
+    private var readyContent: some View {
+        if model.config.directories.isEmpty {
+            EmptyState(
+                icon: "folder.badge.plus",
+                title: "Add an Image Folder",
+                message: "Choose folders that contain the images you want to search.",
+                actionTitle: "Add Folder",
+                action: model.addDirectory
+            )
+        } else {
+            EmptyState(
+                icon: "photo.on.rectangle.angled",
+                title: "Ready to Search",
+                message: "Drop, paste, or choose an image to find local matches."
+            )
+        }
     }
 
     private var sectionTitle: String {
@@ -186,52 +201,63 @@ private struct DropZone: View {
     @State private var isTargeted = false
 
     var body: some View {
-        Button(action: model.selectQueryImage) {
-            ZStack(alignment: .topTrailing) {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isTargeted ? Color.accentColor.opacity(0.10) : Color(nsColor: .controlBackgroundColor))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(
-                                isTargeted ? Color.accentColor : Color(nsColor: .separatorColor),
-                                style: StrokeStyle(lineWidth: isTargeted ? 2 : 1, dash: model.queryImage == nil ? [7, 5] : [])
-                            )
+        ZStack(alignment: .topTrailing) {
+            Button(action: model.selectQueryImage) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(isTargeted ? Color.accentColor.opacity(0.10) : Color(nsColor: .controlBackgroundColor))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .strokeBorder(
+                                    isTargeted ? Color.accentColor : Color(nsColor: .separatorColor),
+                                    style: StrokeStyle(
+                                        lineWidth: isTargeted ? 2 : 1,
+                                        dash: model.queryImage == nil ? [7, 5] : []
+                                    )
+                                )
+                        }
+
+                    if let image = model.queryImage {
+                        Image(nsImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .padding(12)
+                    } else {
+                        VStack(spacing: 10) {
+                            Image(systemName: "photo.badge.plus")
+                                .font(.system(size: 42, weight: .light))
+                                .foregroundStyle(.tint)
+                            Text("Drop an image here")
+                                .font(.headline)
+                            Text("or click to choose · ⌘V to paste")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
                     }
 
-                if let image = model.queryImage {
-                    Image(nsImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .padding(18)
-                    Button(action: model.resetContent) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title2)
-                            .symbolRenderingMode(.hierarchical)
-                    }
-                    .buttonStyle(.borderless)
-                    .padding(12)
-                } else {
-                    VStack(spacing: 10) {
-                        Image(systemName: "photo.badge.plus")
-                            .font(.system(size: 42, weight: .light))
-                            .foregroundStyle(.tint)
-                        Text("Drop an image here")
-                            .font(.headline)
-                        Text("or click to choose · ⌘V to paste")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                    if model.isWorking {
+                        ProgressView()
+                            .controlSize(.small)
+                            .padding(14)
                     }
                 }
-
-                if model.isWorking {
-                    ProgressView()
-                        .controlSize(.small)
-                        .padding(14)
-                }
+                .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .help(model.queryImage == nil ? "Choose an image to search" : "Choose a different image")
+
+            if model.queryImage != nil {
+                Button(action: model.resetContent) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .symbolRenderingMode(.hierarchical)
+                }
+                .buttonStyle(.borderless)
+                .help("Clear search")
+                .accessibilityLabel("Clear search")
+                .padding(10)
+            }
         }
-        .buttonStyle(.plain)
         .onDrop(of: [UTType.fileURL.identifier], isTargeted: $isTargeted) { providers in
             guard let provider = providers.first else { return false }
             _ = provider.loadObject(ofClass: NSURL.self) { object, _ in
@@ -274,26 +300,45 @@ private struct SearchResultsGrid: View {
 
 private struct ResultCard: View {
     @EnvironmentObject private var model: AppModel
+    @FocusState private var isFocused: Bool
     let result: SearchResult
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Thumbnail(path: result.record.path)
-                .frame(height: 125)
-                .frame(maxWidth: .infinity)
-                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
-            Text(URL(fileURLWithPath: result.record.path).lastPathComponent)
-                .font(.subheadline.weight(.medium))
-                .lineLimit(1)
-            Label("\(result.similarity)% match", systemImage: "checkmark.circle.fill")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(scoreColor)
+        Button {
+            model.reveal(result.record.path)
+        } label: {
+            VStack(alignment: .leading, spacing: 7) {
+                Thumbnail(path: result.record.path)
+                    .frame(height: 125)
+                    .frame(maxWidth: .infinity)
+                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
+                Text(fileURL.lastPathComponent)
+                    .font(.subheadline.weight(.medium))
+                    .lineLimit(1)
+                Text(fileURL.deletingLastPathComponent().lastPathComponent)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Label("\(result.similarity)% match", systemImage: "checkmark.circle.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(scoreColor)
+            }
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .focused($isFocused)
         .padding(10)
         .background(.background, in: RoundedRectangle(cornerRadius: 12))
-        .overlay { RoundedRectangle(cornerRadius: 12).stroke(Color(nsColor: .separatorColor).opacity(0.5)) }
-        .contentShape(Rectangle())
-        .onTapGesture(count: 2) { model.reveal(result.record.path) }
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(
+                    isFocused ? Color.accentColor : Color(nsColor: .separatorColor).opacity(0.5),
+                    lineWidth: isFocused ? 2 : 1
+                )
+        }
+        .help("Reveal \(fileURL.lastPathComponent) in Finder")
+        .accessibilityLabel("\(fileURL.lastPathComponent), \(result.similarity) percent match")
+        .accessibilityHint("Reveals the image in Finder")
         .contextMenu {
             Button("Reveal in Finder") { model.reveal(result.record.path) }
             Button("Open Image") { model.open(result.record.path) }
@@ -304,6 +349,8 @@ private struct ResultCard: View {
             }
         }
     }
+
+    private var fileURL: URL { URL(fileURLWithPath: result.record.path) }
 
     private var scoreColor: Color {
         result.similarity >= 95 ? .green : result.similarity >= 80 ? .accentColor : .orange
@@ -325,28 +372,15 @@ private struct DuplicateGroupsView: View {
                                 Text("Group \(index + 1)").font(.headline)
                                 Text("\(group.records.count) images").foregroundStyle(.secondary)
                                 Spacer()
-                                Text("Keeping best quality").font(.caption).foregroundStyle(.secondary)
+                                Text("Best resolution will be kept").font(.caption).foregroundStyle(.secondary)
                             }
                             ScrollView(.horizontal) {
                                 HStack(spacing: 12) {
                                     ForEach(group.records) { record in
-                                        VStack(alignment: .leading, spacing: 5) {
-                                            Thumbnail(path: record.path)
-                                                .frame(width: 120, height: 90)
-                                                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
-                                            Text(URL(fileURLWithPath: record.path).lastPathComponent)
-                                                .font(.caption)
-                                                .lineLimit(1)
-                                                .frame(width: 120, alignment: .leading)
-                                            if record.id == group.records.first?.id {
-                                                Label("Keep", systemImage: "checkmark.circle.fill")
-                                                    .font(.caption2.weight(.semibold))
-                                                    .foregroundStyle(.green)
-                                            } else {
-                                                Text("Duplicate").font(.caption2).foregroundStyle(.secondary)
-                                            }
-                                        }
-                                        .onTapGesture(count: 2) { model.reveal(record.path) }
+                                        DuplicateRecordCard(
+                                            record: record,
+                                            isKeeper: record.id == group.records.first?.id
+                                        )
                                     }
                                 }
                             }
@@ -359,6 +393,58 @@ private struct DuplicateGroupsView: View {
                 .padding(2)
             }
         }
+    }
+}
+
+private struct DuplicateRecordCard: View {
+    @EnvironmentObject private var model: AppModel
+    @FocusState private var isFocused: Bool
+    let record: ImageRecord
+    let isKeeper: Bool
+
+    var body: some View {
+        Button {
+            model.reveal(record.path)
+        } label: {
+            VStack(alignment: .leading, spacing: 5) {
+                Thumbnail(path: record.path)
+                    .frame(width: 132, height: 92)
+                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+                Text(fileURL.lastPathComponent)
+                    .font(.caption.weight(.medium))
+                    .lineLimit(1)
+                Text("\(record.pixelWidth) × \(record.pixelHeight) · \(formattedSize)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Label(
+                    isKeeper ? "Keep" : "Move to Trash",
+                    systemImage: isKeeper ? "checkmark.circle.fill" : "trash"
+                )
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(isKeeper ? Color.green : Color.secondary)
+            }
+            .frame(width: 132, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .focused($isFocused)
+        .padding(8)
+        .background(.background, in: RoundedRectangle(cornerRadius: 10))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(isFocused ? Color.accentColor : Color.clear, lineWidth: 2)
+        }
+        .help("Reveal \(fileURL.lastPathComponent) in Finder")
+        .accessibilityLabel(
+            "\(fileURL.lastPathComponent), \(record.pixelWidth) by \(record.pixelHeight), \(formattedSize), \(isKeeper ? "keep" : "move to Trash")"
+        )
+    }
+
+    private var fileURL: URL { URL(fileURLWithPath: record.path) }
+
+    private var formattedSize: String {
+        ByteCountFormatter.string(fromByteCount: record.fileSize, countStyle: .file)
     }
 }
 

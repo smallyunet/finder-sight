@@ -347,7 +347,7 @@ final class AppModel: ObservableObject {
             let archive = try JSONDecoder().decode(IndexArchive.self, from: data)
             guard archive.version == AppConstants.indexVersion else { return }
             records = archive.records
-            status = "Loaded \(records.count) images"
+            status = "Ready"
         } catch {
             errorMessage = "Couldn’t load the image index. Rebuild it to continue."
         }

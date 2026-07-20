@@ -5,37 +5,46 @@ struct SettingsView: View {
     @EnvironmentObject private var model: AppModel
     @State private var updateStatus = ""
     @State private var isChecking = false
+    @State private var availableRelease: GitHubRelease?
 
     var body: some View {
         Form {
             Section("Search") {
-                HStack {
-                    Slider(
+                LabeledContent("Minimum match score") {
+                    HStack {
+                        Slider(
+                            value: Binding(
+                                get: { Double(model.config.similarityThreshold) },
+                                set: {
+                                    model.config.similarityThreshold = Int($0)
+                                    model.saveSettings()
+                                }
+                            ),
+                            in: 0...100,
+                            step: 1
+                        )
+                        .accessibilityLabel("Minimum match score")
+                        Text("\(model.config.similarityThreshold)%")
+                            .monospacedDigit()
+                            .frame(width: 44, alignment: .trailing)
+                    }
+                }
+                .help("Only images at or above this similarity are shown as matches.")
+
+                LabeledContent("Maximum results") {
+                    Stepper(
+                        "\(model.config.maxResults)",
                         value: Binding(
-                            get: { Double(model.config.similarityThreshold) },
+                            get: { model.config.maxResults },
                             set: {
-                                model.config.similarityThreshold = Int($0)
+                                model.config.maxResults = $0
                                 model.saveSettings()
                             }
                         ),
-                        in: 0...100,
-                        step: 1
+                        in: 1...100
                     )
-                    Text("\(model.config.similarityThreshold)%")
-                        .monospacedDigit()
-                        .frame(width: 44, alignment: .trailing)
+                    .monospacedDigit()
                 }
-                Stepper(
-                    "Maximum results: \(model.config.maxResults)",
-                    value: Binding(
-                        get: { model.config.maxResults },
-                        set: {
-                            model.config.maxResults = $0
-                            model.saveSettings()
-                        }
-                    ),
-                    in: 1...100
-                )
             }
 
             Section("About") {
@@ -49,23 +58,28 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                if let availableRelease,
+                   let releaseURL = URL(string: availableRelease.htmlURL) {
+                    Link("View \(availableRelease.tagName) Release", destination: releaseURL)
+                }
                 Link("View Finder Sight on GitHub", destination: URL(string: "https://github.com/smallyunet/finder-sight")!)
             }
         }
         .formStyle(.grouped)
         .padding(8)
-        .frame(width: 460, height: 300)
+        .frame(width: 500, height: 370)
     }
 
     private func checkForUpdates() {
         isChecking = true
         updateStatus = ""
+        availableRelease = nil
         Task {
             do {
                 let release = try await UpdateService.latestRelease()
                 if UpdateService.isNewer(release.tagName, than: AppConstants.version) {
                     updateStatus = "Version \(release.tagName) is available"
-                    if let url = URL(string: release.htmlURL) { NSWorkspace.shared.open(url) }
+                    availableRelease = release
                 } else {
                     updateStatus = "You’re up to date"
                 }

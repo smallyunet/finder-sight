@@ -19,13 +19,13 @@ The sidebar shows indexing progress and the number of indexed images. Your folde
 - Click the drop zone and choose an image.
 - Copy an image or image file and press `⌘V`.
 
-Matches are ranked by perceptual similarity. Double-click a result to reveal it in Finder. Right-click for Open, Reveal, and Copy Path actions.
+Matches are ranked by perceptual similarity. Select a result to reveal it in Finder. Result cards show the containing folder, and the context menu provides Open, Reveal, and Copy Path actions.
 
 ## Find duplicates
 
 Choose **Library → Find Duplicates** (`⌘D`). Exact perceptual-hash matches are grouped together. Finder Sight ranks the highest-resolution and highest-quality image first.
 
-**Move Duplicates to Trash** keeps the best image in every group and sends the others to the macOS Trash, where they remain recoverable.
+Each duplicate card shows its dimensions and file size so you can see why Finder Sight selected the highest-quality copy. **Move Duplicates to Trash** keeps the best image in every group and sends the others to the macOS Trash, where they remain recoverable.
 
 ## Settings
 
