@@ -89,8 +89,14 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
                 if model.isWorking {
-                    ProgressView(value: model.progress)
-                        .progressViewStyle(.linear)
+                    HStack(spacing: 8) {
+                        ProgressView(value: model.progress)
+                            .progressViewStyle(.linear)
+                        if model.isIndexing {
+                            Button("Cancel", action: model.cancelIndexing)
+                                .buttonStyle(.link)
+                        }
+                    }
                 }
                 HStack {
                     Text("\(model.records.count.formatted()) images")
@@ -161,7 +167,11 @@ struct ContentView: View {
     private var sectionTitle: String {
         switch model.mode {
         case .ready: return "Search Matches"
-        case .searchResults: return model.results.isEmpty ? "No Matches Found" : "Found \(model.results.count) Matches"
+        case .searchResults:
+            if model.results.isEmpty { return "No Matches Found" }
+            return model.showingClosestResults
+                ? "No Matches · Showing \(model.results.count) Closest Images"
+                : "Found \(model.results.count) Matches"
         case .duplicates:
             let count = model.duplicateGroups.reduce(0) { $0 + $1.records.count }
             return model.duplicateGroups.isEmpty
@@ -240,13 +250,23 @@ private struct SearchResultsGrid: View {
         if model.results.isEmpty {
             EmptyState(icon: "magnifyingglass", title: "No Matches Found", message: "Try lowering the minimum match score or adding more folders.")
         } else {
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 145, maximum: 190), spacing: 18)], spacing: 20) {
-                    ForEach(model.results) { result in
-                        ResultCard(result: result)
-                    }
+            VStack(alignment: .leading, spacing: 10) {
+                if model.showingClosestResults {
+                    Label(
+                        "No images met the minimum match score. These are the closest results.",
+                        systemImage: "info.circle"
+                    )
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
                 }
-                .padding(2)
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 145, maximum: 190), spacing: 18)], spacing: 20) {
+                        ForEach(model.results) { result in
+                            ResultCard(result: result)
+                        }
+                    }
+                    .padding(2)
+                }
             }
         }
     }
@@ -344,15 +364,28 @@ private struct DuplicateGroupsView: View {
 
 private struct Thumbnail: View {
     let path: String
+    @State private var image: NSImage?
+
     var body: some View {
         Group {
-            if let image = NSImage(contentsOfFile: path) {
+            if let image {
                 Image(nsImage: image).resizable().scaledToFit()
             } else {
-                Image(systemName: "photo").font(.largeTitle).foregroundStyle(.tertiary)
+                ZStack {
+                    Image(systemName: "photo").font(.largeTitle).foregroundStyle(.tertiary)
+                    ProgressView().controlSize(.small)
+                }
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .task(id: path) {
+            let loaded = await Task.detached(priority: .utility) {
+                LoadedThumbnail(
+                    image: ThumbnailCache.shared.image(at: path, maxPixelSize: 360)
+                )
+            }.value
+            image = loaded.image
+        }
     }
 }
 

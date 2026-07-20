@@ -1,7 +1,10 @@
 import Foundation
 
 enum AppConstants {
-    static let version = "0.2.0"
+    static var version: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+            ?? "development"
+    }
     static let bundleIdentifier = "com.smallyunet.finder-sight"
     static let indexVersion = 1
     static let defaultSimilarity = 80
@@ -58,6 +61,17 @@ struct SearchResult: Identifiable, Hashable {
     var similarity: Int {
         max(0, min(100, Int((1.0 - Double(distance) / 256.0) * 100.0)))
     }
+}
+
+struct SearchOutcome: Equatable {
+    let results: [SearchResult]
+    let isClosestFallback: Bool
+}
+
+struct IndexingResult {
+    let records: [ImageRecord]
+    let failedCount: Int
+    let wasCancelled: Bool
 }
 
 struct DuplicateGroup: Identifiable, Hashable {

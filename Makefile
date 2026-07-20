@@ -1,6 +1,6 @@
 .PHONY: build dmg test clean run
 
-VERSION ?= 0.2.0
+VERSION ?= $(shell tr -d '[:space:]' < VERSION)
 
 build:
 	bash scripts/build_app.sh $(VERSION)

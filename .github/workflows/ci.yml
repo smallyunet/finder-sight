@@ -17,4 +17,4 @@ jobs:
       run: swift test
 
     - name: Build app bundle
-      run: bash scripts/build_app.sh 0.2.0
+      run: bash scripts/build_app.sh

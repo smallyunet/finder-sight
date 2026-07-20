@@ -8,14 +8,17 @@ final class AppModel: ObservableObject {
     @Published private(set) var records: [ImageRecord] = []
     @Published private(set) var results: [SearchResult] = []
     @Published private(set) var duplicateGroups: [DuplicateGroup] = []
+    @Published private(set) var showingClosestResults = false
     @Published private(set) var mode: ContentMode = .ready
     @Published private(set) var queryImage: NSImage?
     @Published private(set) var isWorking = false
+    @Published private(set) var isIndexing = false
     @Published private(set) var progress = 0.0
     @Published private(set) var status = "Ready"
     @Published var errorMessage: String?
 
     private var didPrepare = false
+    private var indexingController: IndexingController?
 
     func prepare() {
         guard !didPrepare else { return }
@@ -94,28 +97,53 @@ final class AppModel: ObservableObject {
             return
         }
         isWorking = true
+        isIndexing = true
         progress = 0
         status = "Scanning folders…"
         let directories = config.directories
         let existing = Dictionary(uniqueKeysWithValues: records.map { ($0.path, $0) })
+        let controller = IndexingController()
+        indexingController = controller
 
         Task {
-            let indexed = await Task.detached(priority: .userInitiated) {
-                ImageIndexer.scan(directories: directories, existing: existing) { current, total, name in
+            let indexingResult = await Task.detached(priority: .userInitiated) {
+                ImageIndexer.scan(
+                    directories: directories,
+                    existing: existing,
+                    controller: controller
+                ) { current, total, name in
+                    guard current == total || current.isMultiple(of: 10) else { return }
                     Task { @MainActor [weak self] in
-                        guard let self else { return }
+                        guard let self,
+                              self.indexingController === controller,
+                              !controller.isCancelled else { return }
                         self.progress = total == 0 ? 0 : Double(current) / Double(total)
                         self.status = "Indexing \(current) of \(total) · \(name)"
                     }
                 }
             }.value
-            records = indexed
-            saveIndex()
-            status = "Indexed \(records.count) images"
-            progress = 1
+
+            if indexingResult.wasCancelled {
+                status = "Indexing cancelled"
+            } else {
+                records = indexingResult.records
+                saveIndex()
+                status = indexingResult.failedCount == 0
+                    ? "Indexed \(records.count) images"
+                    : "Indexed \(records.count) images · \(indexingResult.failedCount) skipped"
+                progress = 1
+            }
             isWorking = false
-            if mode == .duplicates { findDuplicates() }
+            isIndexing = false
+            indexingController = nil
+            if !indexingResult.wasCancelled && mode == .duplicates { findDuplicates() }
         }
+    }
+
+    func cancelIndexing() {
+        guard isIndexing else { return }
+        status = "Cancelling indexing…"
+        indexingController?.cancel()
     }
 
     func search(url: URL) {
@@ -137,7 +165,7 @@ final class AppModel: ObservableObject {
         Task {
             do {
                 let hash = try await Task.detached { try PerceptualHash.make(from: url).hash }.value
-                let found = await Task.detached {
+                let outcome = await Task.detached {
                     ImageSearcher.search(
                         hash: hash,
                         records: currentRecords,
@@ -145,10 +173,13 @@ final class AppModel: ObservableObject {
                         limit: limit
                     )
                 }.value
-                results = found
+                results = outcome.results
+                showingClosestResults = outcome.isClosestFallback
                 duplicateGroups = []
                 mode = .searchResults
-                status = "Found \(found.count) matches"
+                status = outcome.isClosestFallback
+                    ? "No matches · Showing \(outcome.results.count) closest images"
+                    : "Found \(outcome.results.count) matches"
             } catch {
                 errorMessage = error.localizedDescription
                 status = "Search failed"
@@ -172,7 +203,7 @@ final class AppModel: ObservableObject {
         Task {
             do {
                 let hash = try PerceptualHash.make(from: image)
-                results = await Task.detached {
+                let outcome = await Task.detached {
                     ImageSearcher.search(
                         hash: hash,
                         records: currentRecords,
@@ -180,9 +211,13 @@ final class AppModel: ObservableObject {
                         limit: limit
                     )
                 }.value
+                results = outcome.results
+                showingClosestResults = outcome.isClosestFallback
                 duplicateGroups = []
                 mode = .searchResults
-                status = "Found \(results.count) matches"
+                status = outcome.isClosestFallback
+                    ? "No matches · Showing \(outcome.results.count) closest images"
+                    : "Found \(outcome.results.count) matches"
             } catch {
                 errorMessage = error.localizedDescription
                 status = "Search failed"
@@ -205,6 +240,7 @@ final class AppModel: ObservableObject {
                 DuplicateFinder.groups(in: snapshot, directories: directories)
             }.value
             results = []
+            showingClosestResults = false
             mode = .duplicates
             status = duplicateGroups.isEmpty
                 ? "No duplicates found"
@@ -247,15 +283,22 @@ final class AppModel: ObservableObject {
         alert.addButton(withTitle: "Clear Index")
         alert.addButton(withTitle: "Cancel")
         guard alert.runModal() == .alertFirstButtonReturn else { return }
-        records = []
-        try? FileManager.default.removeItem(at: AppConstants.indexURL)
-        resetContent()
-        status = "Index cleared"
+        do {
+            if FileManager.default.fileExists(atPath: AppConstants.indexURL.path) {
+                try FileManager.default.removeItem(at: AppConstants.indexURL)
+            }
+            records = []
+            resetContent()
+            status = "Index cleared"
+        } catch {
+            errorMessage = "Couldn’t clear the image index: \(error.localizedDescription)"
+        }
     }
 
     func resetContent() {
         results = []
         duplicateGroups = []
+        showingClosestResults = false
         queryImage = nil
         mode = .ready
     }
@@ -275,36 +318,53 @@ final class AppModel: ObservableObject {
     }
 
     private func loadConfig() {
-        guard let data = try? Data(contentsOf: AppConstants.configURL),
-              let decoded = try? JSONDecoder().decode(AppConfig.self, from: data) else { return }
-        config = decoded
+        guard FileManager.default.fileExists(atPath: AppConstants.configURL.path) else { return }
+        do {
+            let data = try Data(contentsOf: AppConstants.configURL)
+            config = try JSONDecoder().decode(AppConfig.self, from: data)
+        } catch {
+            errorMessage = "Couldn’t load settings: \(error.localizedDescription)"
+        }
     }
 
     private func saveConfig() {
-        try? FileManager.default.createDirectory(
-            at: AppConstants.supportDirectory,
-            withIntermediateDirectories: true
-        )
-        guard let data = try? JSONEncoder.pretty.encode(config) else { return }
-        try? data.write(to: AppConstants.configURL, options: .atomic)
+        do {
+            try FileManager.default.createDirectory(
+                at: AppConstants.supportDirectory,
+                withIntermediateDirectories: true
+            )
+            let data = try JSONEncoder.pretty.encode(config)
+            try data.write(to: AppConstants.configURL, options: .atomic)
+        } catch {
+            errorMessage = "Couldn’t save settings: \(error.localizedDescription)"
+        }
     }
 
     private func loadIndex() {
-        guard let data = try? Data(contentsOf: AppConstants.indexURL),
-              let archive = try? JSONDecoder().decode(IndexArchive.self, from: data),
-              archive.version == AppConstants.indexVersion else { return }
-        records = archive.records
-        status = "Loaded \(records.count) images"
+        guard FileManager.default.fileExists(atPath: AppConstants.indexURL.path) else { return }
+        do {
+            let data = try Data(contentsOf: AppConstants.indexURL)
+            let archive = try JSONDecoder().decode(IndexArchive.self, from: data)
+            guard archive.version == AppConstants.indexVersion else { return }
+            records = archive.records
+            status = "Loaded \(records.count) images"
+        } catch {
+            errorMessage = "Couldn’t load the image index. Rebuild it to continue."
+        }
     }
 
     private func saveIndex() {
-        try? FileManager.default.createDirectory(
-            at: AppConstants.supportDirectory,
-            withIntermediateDirectories: true
-        )
-        let archive = IndexArchive(version: AppConstants.indexVersion, records: records)
-        guard let data = try? JSONEncoder().encode(archive) else { return }
-        try? data.write(to: AppConstants.indexURL, options: .atomic)
+        do {
+            try FileManager.default.createDirectory(
+                at: AppConstants.supportDirectory,
+                withIntermediateDirectories: true
+            )
+            let archive = IndexArchive(version: AppConstants.indexVersion, records: records)
+            let data = try JSONEncoder().encode(archive)
+            try data.write(to: AppConstants.indexURL, options: .atomic)
+        } catch {
+            errorMessage = "Couldn’t save the image index: \(error.localizedDescription)"
+        }
     }
 }
 

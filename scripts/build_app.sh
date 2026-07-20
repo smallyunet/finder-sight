@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="${1:-0.2.0}"
+VERSION="${1:-$(tr -d '[:space:]' < "$PROJECT_ROOT/VERSION")}"
 CONFIGURATION="${CONFIGURATION:-release}"
 APP_DIR="$PROJECT_ROOT/dist/Finder Sight.app"
 CONTENTS="$APP_DIR/Contents"

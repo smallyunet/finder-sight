@@ -16,14 +16,24 @@ enum CoreSmokeTests {
             path: "/distant.png", hash: ones, modificationTime: 0,
             pixelWidth: 100, pixelHeight: 100, fileSize: 100
         )
-        let results = ImageSearcher.search(
+        let outcome = ImageSearcher.search(
             hash: zeros,
             records: [distant, exact],
             minimumSimilarity: 80,
             limit: 20
         )
-        precondition(results.map(\.record.path) == ["/exact.png"])
-        precondition(results.first?.similarity == 100)
+        precondition(outcome.results.map(\.record.path) == ["/exact.png"])
+        precondition(outcome.results.first?.similarity == 100)
+        precondition(!outcome.isClosestFallback)
+
+        let fallback = ImageSearcher.search(
+            hash: zeros,
+            records: [distant],
+            minimumSimilarity: 100,
+            limit: 20
+        )
+        precondition(fallback.results.map(\.record.path) == ["/distant.png"])
+        precondition(fallback.isClosestFallback)
         print("Core smoke tests passed")
     }
 }

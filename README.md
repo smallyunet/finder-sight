@@ -9,6 +9,9 @@ A native macOS app for finding local images with another image. Finder Sight ind
 - Fast 256-bit perceptual hashing and local indexing
 - Finder reveal and native context menus
 - Exact duplicate groups with quality-aware cleanup to Trash
+- Clear separation between true matches and closest fallback results
+- Cancellable indexing with skipped-file reporting
+- Asynchronous, memory-bounded thumbnail loading
 - Dark Mode, macOS accent colors, keyboard shortcuts, and Settings scene
 - Fully local processing
 

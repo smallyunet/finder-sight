@@ -1,24 +1,44 @@
 import Foundation
 
+final class IndexingController: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    var isCancelled: Bool {
+        lock.withLock { cancelled }
+    }
+
+    func cancel() {
+        lock.withLock { cancelled = true }
+    }
+}
+
 enum ImageIndexer {
     static func scan(
         directories: [String],
         existing: [String: ImageRecord],
+        controller: IndexingController = IndexingController(),
         progress: @escaping @Sendable (Int, Int, String) -> Void
-    ) -> [ImageRecord] {
+    ) -> IndexingResult {
         let manager = FileManager.default
         let keys: [URLResourceKey] = [.isRegularFileKey, .contentModificationDateKey, .fileSizeKey]
         var urls: [URL] = []
+        var discoveryFailures = 0
 
-        for path in directories {
+        directoryLoop: for path in directories {
+            guard !controller.isCancelled else { break }
             let root = URL(fileURLWithPath: path, isDirectory: true)
             guard let enumerator = manager.enumerator(
                 at: root,
                 includingPropertiesForKeys: keys,
                 options: [.skipsHiddenFiles, .skipsPackageDescendants]
-            ) else { continue }
+            ) else {
+                discoveryFailures += 1
+                continue
+            }
 
             for case let url as URL in enumerator {
+                guard !controller.isCancelled else { break directoryLoop }
                 guard AppConstants.supportedExtensions.contains(url.pathExtension.lowercased()),
                       (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else {
                     continue
@@ -32,9 +52,11 @@ enum ImageIndexer {
         var records: [ImageRecord] = []
         records.reserveCapacity(total)
         var completed = 0
+        var failedCount = discoveryFailures
 
         DispatchQueue.concurrentPerform(iterations: total) { index in
             autoreleasepool {
+                guard !controller.isCancelled else { return }
                 let url = urls[index]
                 let values = try? url.resourceValues(forKeys: Set(keys))
                 let mtime = values?.contentModificationDate?.timeIntervalSince1970 ?? 0
@@ -56,7 +78,11 @@ enum ImageIndexer {
                 }
 
                 lock.lock()
-                if let record { records.append(record) }
+                if let record {
+                    records.append(record)
+                } else {
+                    failedCount += 1
+                }
                 completed += 1
                 let current = completed
                 lock.unlock()
@@ -64,7 +90,12 @@ enum ImageIndexer {
             }
         }
 
-        return records.sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+        let sorted = records.sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+        return IndexingResult(
+            records: sorted,
+            failedCount: failedCount,
+            wasCancelled: controller.isCancelled
+        )
     }
 }
 
@@ -74,7 +105,7 @@ enum ImageSearcher {
         records: [ImageRecord],
         minimumSimilarity: Int,
         limit: Int
-    ) -> [SearchResult] {
+    ) -> SearchOutcome {
         let threshold = Int(256.0 * (1.0 - Double(minimumSimilarity) / 100.0))
         let ranked = records.map {
             SearchResult(record: $0, distance: PerceptualHash.distance(hash, $0.hash))
@@ -83,7 +114,12 @@ enum ImageSearcher {
             return $0.distance < $1.distance
         }
         let matches = ranked.filter { $0.distance <= threshold }
-        return Array((matches.isEmpty ? ranked : matches).prefix(max(1, limit)))
+        let isFallback = matches.isEmpty && !ranked.isEmpty
+        let visibleResults = matches.isEmpty ? ranked : matches
+        return SearchOutcome(
+            results: Array(visibleResults.prefix(max(1, limit))),
+            isClosestFallback: isFallback
+        )
     }
 }
 
