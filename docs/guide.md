@@ -19,7 +19,10 @@ The sidebar shows indexing progress and the number of indexed images. Your folde
 - Click the drop zone and choose an image.
 - Copy an image or image file and press `⌘V`.
 
-Matches are ranked by perceptual similarity. Select a result to reveal it in Finder. Result cards show the containing folder, and the context menu provides Open, Reveal, and Copy Path actions.
+Matches combine perceptual hashes with local Apple Vision features. Solid borders are trimmed
+before visual analysis, and full-image plus overlapping regional features help find an image
+from a crop. Select a result to reveal it in Finder. Result cards show the containing folder,
+and the context menu provides Open, Reveal, and Copy Path actions.
 
 ## Find duplicates
 
@@ -41,4 +44,5 @@ JPEG, PNG, WebP, BMP, GIF, HEIC/HEIF, TIFF, and ICO files supported by the insta
 
 ## Privacy
 
-Finder Sight stores only file paths, metadata, and small perceptual hashes. It never uploads your images.
+Finder Sight stores only file paths, metadata, perceptual hashes, and on-device Apple Vision
+feature data. It never uploads your images.

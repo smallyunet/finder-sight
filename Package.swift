@@ -8,8 +8,15 @@ let package = Package(
         .executable(name: "FinderSight", targets: ["FinderSight"])
     ],
     targets: [
+        .target(
+            name: "VisionBridge",
+            path: "Sources/VisionBridge",
+            publicHeadersPath: "include",
+            linkerSettings: [.linkedFramework("Vision")]
+        ),
         .executableTarget(
             name: "FinderSight",
+            dependencies: ["VisionBridge"],
             path: "Sources/FinderSight"
         ),
         .testTarget(

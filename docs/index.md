@@ -14,9 +14,11 @@ Finder Sight is a native macOS app that finds local images using another image a
 - Drag and drop, clipboard search, Finder reveal, and native context menus
 - Dark Mode, accent colors, keyboard navigation, and accessibility support
 
-## Private perceptual search
+## Private visual search
 
-Finder Sight builds a compact 256-bit perceptual hash for each local image. Search and duplicate detection happen entirely on your Mac; images are never uploaded.
+Finder Sight combines compact perceptual hashes with on-device Apple Vision features for
+full images and overlapping regions. Search and duplicate detection happen entirely on your
+Mac; images are never uploaded.
 
 ## Quick start
 

@@ -319,7 +319,10 @@ private struct ResultCard: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                Label("\(result.similarity)% match", systemImage: "checkmark.circle.fill")
+                Label(
+                    "\(result.similarity)% \(result.isVisualMatch ? "visual" : "match")",
+                    systemImage: result.isVisualMatch ? "eye.fill" : "checkmark.circle.fill"
+                )
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(scoreColor)
             }
@@ -337,7 +340,9 @@ private struct ResultCard: View {
                 )
         }
         .help("Reveal \(fileURL.lastPathComponent) in Finder")
-        .accessibilityLabel("\(fileURL.lastPathComponent), \(result.similarity) percent match")
+        .accessibilityLabel(
+            "\(fileURL.lastPathComponent), \(result.similarity) percent \(result.isVisualMatch ? "visual similarity" : "match")"
+        )
         .accessibilityHint("Reveals the image in Finder")
         .contextMenu {
             Button("Reveal in Finder") { model.reveal(result.record.path) }

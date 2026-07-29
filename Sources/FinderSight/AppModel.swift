@@ -128,9 +128,16 @@ final class AppModel: ObservableObject {
             } else {
                 records = indexingResult.records
                 saveIndex()
-                status = indexingResult.failedCount == 0
+                var details: [String] = []
+                if indexingResult.failedCount > 0 {
+                    details.append("\(indexingResult.failedCount) skipped")
+                }
+                if indexingResult.visualFeatureFailureCount > 0 {
+                    details.append("\(indexingResult.visualFeatureFailureCount) hash-only")
+                }
+                status = details.isEmpty
                     ? "Indexed \(records.count) images"
-                    : "Indexed \(records.count) images · \(indexingResult.failedCount) skipped"
+                    : "Indexed \(records.count) images · \(details.joined(separator: " · "))"
                 progress = 1
             }
             isWorking = false
@@ -164,10 +171,14 @@ final class AppModel: ObservableObject {
 
         Task {
             do {
-                let hash = try await Task.detached { try PerceptualHash.make(from: url).hash }.value
+                let query = try await Task.detached {
+                    let hash = try PerceptualHash.make(from: url).hash
+                    let visualFeature = try? VisualFeatureEngine.makeQueryFeature(from: url)
+                    return ImageSearcher.Query(hash: hash, visualFeature: visualFeature)
+                }.value
                 let outcome = await Task.detached {
                     ImageSearcher.search(
-                        hash: hash,
+                        query: query,
                         records: currentRecords,
                         minimumSimilarity: similarity,
                         limit: limit
@@ -203,9 +214,11 @@ final class AppModel: ObservableObject {
         Task {
             do {
                 let hash = try PerceptualHash.make(from: image)
+                let visualFeature = try? VisualFeatureEngine.makeQueryFeature(from: image)
+                let query = ImageSearcher.Query(hash: hash, visualFeature: visualFeature)
                 let outcome = await Task.detached {
                     ImageSearcher.search(
-                        hash: hash,
+                        query: query,
                         records: currentRecords,
                         minimumSimilarity: similarity,
                         limit: limit

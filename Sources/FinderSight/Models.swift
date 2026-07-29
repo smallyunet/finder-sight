@@ -6,7 +6,7 @@ enum AppConstants {
             ?? "development"
     }
     static let bundleIdentifier = "com.smallyunet.finder-sight"
-    static let indexVersion = 1
+    static let indexVersion = 2
     static let defaultSimilarity = 80
     static let defaultMaxResults = 20
     static let supportedExtensions: Set<String> = [
@@ -46,6 +46,7 @@ struct ImageRecord: Codable, Hashable, Identifiable, Sendable {
     let pixelWidth: Int
     let pixelHeight: Int
     let fileSize: Int64
+    var visualFeatures: [VisualFeature]?
 }
 
 struct IndexArchive: Codable {
@@ -57,8 +58,24 @@ struct SearchResult: Identifiable, Hashable {
     var id: String { record.path }
     let record: ImageRecord
     let distance: Int
+    let visualDistance: Float?
+
+    init(record: ImageRecord, distance: Int, visualDistance: Float? = nil) {
+        self.record = record
+        self.distance = distance
+        self.visualDistance = visualDistance
+    }
 
     var similarity: Int {
+        max(perceptualSimilarity, visualDistance.map(VisualFeatureEngine.similarity) ?? 0)
+    }
+
+    var isVisualMatch: Bool {
+        guard let visualDistance else { return false }
+        return VisualFeatureEngine.similarity(for: visualDistance) > perceptualSimilarity
+    }
+
+    private var perceptualSimilarity: Int {
         max(0, min(100, Int((1.0 - Double(distance) / 256.0) * 100.0)))
     }
 }
@@ -71,6 +88,7 @@ struct SearchOutcome: Equatable {
 struct IndexingResult {
     let records: [ImageRecord]
     let failedCount: Int
+    let visualFeatureFailureCount: Int
     let wasCancelled: Bool
 }
 

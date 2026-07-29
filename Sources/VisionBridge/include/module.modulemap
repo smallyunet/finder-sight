@@ -1,0 +1,4 @@
+module VisionBridge {
+    header "VisionBridge.h"
+    export *
+}

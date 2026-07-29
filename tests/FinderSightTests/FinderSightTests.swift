@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import FinderSight
 
@@ -42,6 +43,74 @@ final class FinderSightTests: XCTestCase {
         )
         XCTAssertEqual(outcome.results.map(\.record.path), ["/nearest.png"])
         XCTAssertTrue(outcome.isClosestFallback)
+    }
+
+    func testVisualFeatureRoundTripDistance() throws {
+        let image = NSImage(size: NSSize(width: 160, height: 120))
+        image.lockFocus()
+        NSColor.white.setFill()
+        NSRect(x: 0, y: 0, width: 160, height: 120).fill()
+        NSColor.systemPurple.setFill()
+        NSBezierPath(ovalIn: NSRect(x: 38, y: 18, width: 84, height: 84)).fill()
+        NSColor.black.setFill()
+        NSRect(x: 72, y: 38, width: 16, height: 62).fill()
+        image.unlockFocus()
+
+        let archive = try VisualFeatureEngine.makeQueryFeature(from: image)
+        let feature = VisualFeature(region: .full, observationArchive: archive)
+        let distance = try XCTUnwrap(
+            VisualFeatureEngine.minimumDistance(from: archive, to: [feature])
+        )
+
+        XCTAssertEqual(distance, 0, accuracy: 0.0001)
+        XCTAssertEqual(VisualFeatureEngine.similarity(for: distance), 100)
+    }
+
+    func testRegionalFeatureFindsAnExactCrop() throws {
+        let width = 200
+        let height = 200
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return XCTFail("Could not create test image context")
+        }
+        context.setFillColor(NSColor.systemRed.cgColor)
+        context.fill(CGRect(x: 0, y: 0, width: 130, height: 130))
+        context.setFillColor(NSColor.systemBlue.cgColor)
+        context.fill(CGRect(x: 70, y: 70, width: 130, height: 130))
+        context.setFillColor(NSColor.black.cgColor)
+        context.fill(CGRect(x: 20, y: 35, width: 70, height: 24))
+        guard let fullImage = context.makeImage(),
+              let crop = fullImage.cropping(to: CGRect(x: 0, y: 0, width: 130, height: 130)) else {
+            return XCTFail("Could not create test images")
+        }
+
+        let indexed = try VisualFeatureEngine.makeIndexFeatures(from: fullImage)
+        let query = try VisualFeatureEngine.makeQueryFeature(from: crop)
+        let distance = try XCTUnwrap(
+            VisualFeatureEngine.minimumDistance(from: query, to: indexed)
+        )
+
+        XCTAssertLessThan(distance, 0.05)
+        XCTAssertGreaterThanOrEqual(VisualFeatureEngine.similarity(for: distance), 97)
+    }
+
+    func testVisualSimilarityCanPromoteAResult() {
+        let record = ImageRecord(
+            path: "/visual.png", hash: String(repeating: "f", count: 64),
+            modificationTime: 0, pixelWidth: 100, pixelHeight: 100, fileSize: 100
+        )
+        let result = SearchResult(record: record, distance: 256, visualDistance: 0.3)
+
+        XCTAssertEqual(result.similarity, 85)
+        XCTAssertTrue(result.isVisualMatch)
     }
 
     func testDuplicateQualityPrefersResolution() {

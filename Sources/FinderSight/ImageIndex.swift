@@ -53,6 +53,7 @@ enum ImageIndexer {
         records.reserveCapacity(total)
         var completed = 0
         var failedCount = discoveryFailures
+        var visualFeatureFailureCount = 0
 
         DispatchQueue.concurrentPerform(iterations: total) { index in
             autoreleasepool {
@@ -62,16 +63,20 @@ enum ImageIndexer {
                 let mtime = values?.contentModificationDate?.timeIntervalSince1970 ?? 0
                 let record: ImageRecord?
 
-                if let cached = existing[url.path], cached.modificationTime == mtime {
+                if let cached = existing[url.path],
+                   cached.modificationTime == mtime,
+                   !(cached.visualFeatures ?? []).isEmpty {
                     record = cached
                 } else if let result = try? PerceptualHash.make(from: url) {
+                    let visualFeatures = (try? VisualFeatureEngine.makeIndexFeatures(from: url)) ?? []
                     record = ImageRecord(
                         path: url.path,
                         hash: result.hash,
                         modificationTime: mtime,
                         pixelWidth: result.width,
                         pixelHeight: result.height,
-                        fileSize: Int64(values?.fileSize ?? 0)
+                        fileSize: Int64(values?.fileSize ?? 0),
+                        visualFeatures: visualFeatures
                     )
                 } else {
                     record = nil
@@ -80,6 +85,9 @@ enum ImageIndexer {
                 lock.lock()
                 if let record {
                     records.append(record)
+                    if (record.visualFeatures ?? []).isEmpty {
+                        visualFeatureFailureCount += 1
+                    }
                 } else {
                     failedCount += 1
                 }
@@ -94,26 +102,55 @@ enum ImageIndexer {
         return IndexingResult(
             records: sorted,
             failedCount: failedCount,
+            visualFeatureFailureCount: visualFeatureFailureCount,
             wasCancelled: controller.isCancelled
         )
     }
 }
 
 enum ImageSearcher {
+    struct Query: Sendable {
+        let hash: String
+        let visualFeature: Data?
+    }
+
     static func search(
         hash: String,
         records: [ImageRecord],
         minimumSimilarity: Int,
         limit: Int
     ) -> SearchOutcome {
-        let threshold = Int(256.0 * (1.0 - Double(minimumSimilarity) / 100.0))
-        let ranked = records.map {
-            SearchResult(record: $0, distance: PerceptualHash.distance(hash, $0.hash))
+        search(
+            query: Query(hash: hash, visualFeature: nil),
+            records: records,
+            minimumSimilarity: minimumSimilarity,
+            limit: limit
+        )
+    }
+
+    static func search(
+        query: Query,
+        records: [ImageRecord],
+        minimumSimilarity: Int,
+        limit: Int
+    ) -> SearchOutcome {
+        let ranked = records.map { record in
+            let visualDistance = query.visualFeature.flatMap {
+                VisualFeatureEngine.minimumDistance(from: $0, to: record.visualFeatures ?? [])
+            }
+            return SearchResult(
+                record: record,
+                distance: PerceptualHash.distance(query.hash, record.hash),
+                visualDistance: visualDistance
+            )
         }.sorted {
-            if $0.distance == $1.distance { return $0.record.path < $1.record.path }
-            return $0.distance < $1.distance
+            if $0.similarity == $1.similarity {
+                if $0.distance == $1.distance { return $0.record.path < $1.record.path }
+                return $0.distance < $1.distance
+            }
+            return $0.similarity > $1.similarity
         }
-        let matches = ranked.filter { $0.distance <= threshold }
+        let matches = ranked.filter { $0.similarity >= minimumSimilarity }
         let isFallback = matches.isEmpty && !ranked.isEmpty
         let visibleResults = matches.isEmpty ? ranked : matches
         return SearchOutcome(

@@ -1,12 +1,14 @@
 # Finder Sight
 
-A native macOS app for finding local images with another image. Finder Sight indexes perceptual hashes on your Mac, then searches them without uploading anything.
+A native macOS app for finding local images with another image. Finder Sight indexes
+perceptual hashes and on-device Apple Vision features, then searches without uploading anything.
 
 ## Features
 
 - Native SwiftUI and AppKit interface
 - Drag, choose, or paste an image to search
-- Fast 256-bit perceptual hashing and local indexing
+- Hybrid perceptual-hash and Apple Vision similarity search
+- Border-aware full-image and regional visual matching
 - Finder reveal and native context menus
 - Exact duplicate groups with quality-aware cleanup to Trash
 - Clear separation between true matches and closest fallback results
@@ -57,7 +59,8 @@ Finder Sight stores configuration and its native index in:
 ~/Library/Application Support/FinderSight/
 ```
 
-Version 0.2 reads the folder and search settings from earlier releases. It rebuilds the old Python index once using the new native hashing engine.
+Finder Sight preserves folder and search settings across upgrades. Versions that change the
+local feature format automatically rebuild the image index without modifying original files.
 
 ## Release
 
