@@ -3,6 +3,20 @@
 A native macOS app for finding local images with another image. Finder Sight indexes
 perceptual hashes and on-device Apple Vision features, then searches without uploading anything.
 
+## Screenshots
+
+### Visual similarity search
+
+<p align="center">
+  <img src="docs/assets/search-results.png" alt="Finder Sight visual similarity search results" width="900">
+</p>
+
+### Duplicate detection
+
+<p align="center">
+  <img src="docs/assets/duplicate-groups.png" alt="Finder Sight duplicate image groups" width="900">
+</p>
+
 ## Features
 
 - Native SwiftUI and AppKit interface
