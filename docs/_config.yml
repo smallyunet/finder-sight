@@ -1,5 +1,12 @@
-theme: jekyll-theme-cayman
 title: Finder Sight
-description: Local Reverse Image Search for macOS
-show_downloads: true
-google_analytics: 
+description: Private visual search for your Mac
+lang: en-US
+url: https://smallyunet.github.io
+baseurl: /finder-sight
+repository: smallyunet/finder-sight
+show_downloads: false
+download_url: https://github.com/smallyunet/finder-sight/releases/latest/download/FinderSight-macOS.dmg
+release_url: https://github.com/smallyunet/finder-sight/releases/latest
+repository_url: https://github.com/smallyunet/finder-sight
+plugins:
+  - jekyll-seo-tag

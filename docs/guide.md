@@ -1,11 +1,21 @@
 ---
 layout: default
 title: User Guide
+description: Learn how to index, search, and clean up local images with Finder Sight.
+nav: guide
+page_class: guide-page
+permalink: /guide/
 ---
 
 # Finder Sight User Guide
 
 Finder Sight is a native macOS image finder. Every image stays on your Mac.
+
+<div class="guide-callout">
+  <strong>New to Finder Sight?</strong>
+  Add a folder with <kbd>⌘O</kbd>, then drop an image into the search area.
+  <a href="{{ site.download_url }}">Download the latest release</a>.
+</div>
 
 ## Add your library
 
@@ -36,7 +46,7 @@ Open **Finder Sight → Settings** (`⌘,`) to change:
 
 - Minimum match score
 - Maximum number of search results
-- Update checking
+- Manual update checking
 
 ## Supported formats
 
@@ -45,4 +55,14 @@ JPEG, PNG, WebP, BMP, GIF, HEIC/HEIF, TIFF, and ICO files supported by the insta
 ## Privacy
 
 Finder Sight stores only file paths, metadata, perceptual hashes, and on-device Apple Vision
-feature data. It never uploads your images.
+feature data. It never uploads your images. The only app network request is a manual update
+check against the public GitHub Releases API.
+
+Read the full [privacy details](https://github.com/smallyunet/finder-sight/blob/main/PRIVACY.md)
+and [security policy](https://github.com/smallyunet/finder-sight/blob/main/SECURITY.md).
+
+## First launch
+
+Finder Sight is currently ad-hoc signed and is not notarized with an Apple Developer ID.
+If macOS blocks the first launch, right-click Finder Sight in Applications, choose **Open**,
+then confirm **Open** in the system dialog.
