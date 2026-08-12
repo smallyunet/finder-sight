@@ -29,7 +29,8 @@ perceptual hashes and on-device Apple Vision features, then searches without upl
 - Hybrid perceptual-hash and Apple Vision similarity search
 - Border-aware full-image and regional visual matching
 - Finder reveal and native context menus
-- Exact duplicate groups with quality-aware cleanup to Trash
+- Dedicated Search and Duplicates workspaces with clear navigation
+- Exact duplicate groups with selectable keepers and storage-recovery estimates
 - Clear separation between true matches and closest fallback results
 - Keyboard-accessible result cards with folder and duplicate-quality details
 - Cancellable indexing with skipped-file reporting
@@ -79,6 +80,8 @@ Standard XCTest coverage is also available through `swift test` on a stable Xcod
 - `⌘I`: Update the index
 - `⌘D`: Find duplicates
 - `⌘V`: Search the clipboard image
+- `⌘1`: Open the Search workspace
+- `⌘2`: Open the Duplicates workspace
 - `⌘,`: Open Settings
 
 ## Data and migration

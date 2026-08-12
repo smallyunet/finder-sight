@@ -36,6 +36,24 @@ enum CoreSmokeTests {
         precondition(fallback.results.map(\.record.path) == ["/distant.png"])
         precondition(fallback.isClosestFallback)
 
+        let recommendedDuplicate = ImageRecord(
+            path: "/recommended.jpg", hash: "same", modificationTime: 0,
+            pixelWidth: 500, pixelHeight: 500, fileSize: 500
+        )
+        let selectedDuplicate = ImageRecord(
+            path: "/selected.jpg", hash: "same", modificationTime: 0,
+            pixelWidth: 100, pixelHeight: 100, fileSize: 100
+        )
+        let duplicateGroup = DuplicateGroup(
+            id: "same",
+            records: [recommendedDuplicate, selectedDuplicate]
+        )
+        let cleanupCandidates = DuplicateFinder.deletionCandidates(
+            in: [duplicateGroup],
+            keeping: [selectedDuplicate.id]
+        )
+        precondition(cleanupCandidates.map(\.id) == [recommendedDuplicate.id])
+
         let featureArchive = try! VisualFeatureEngine.makeQueryFeature(
             from: URL(fileURLWithPath: "icon.png")
         )

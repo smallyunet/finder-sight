@@ -31,6 +31,10 @@ struct SettingsView: View {
                 }
                 .help("Only images at or above this similarity are shown as matches.")
 
+                Text("Higher scores return fewer, more visually similar images.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 LabeledContent("Maximum results") {
                     Stepper(
                         "\(model.config.maxResults)",
@@ -44,6 +48,21 @@ struct SettingsView: View {
                         in: 1...100
                     )
                     .monospacedDigit()
+                }
+
+                Text("Limits how many matches or closest alternatives appear after a search.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                HStack {
+                    Spacer()
+                    Button("Restore Search Defaults") {
+                        model.resetSearchSettings()
+                    }
+                    .disabled(
+                        model.config.similarityThreshold == AppConstants.defaultSimilarity
+                            && model.config.maxResults == AppConstants.defaultMaxResults
+                    )
                 }
             }
 
@@ -67,7 +86,7 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .padding(8)
-        .frame(width: 500, height: 370)
+        .frame(width: 520, height: 450)
     }
 
     private func checkForUpdates() {

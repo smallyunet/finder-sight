@@ -183,6 +183,17 @@ enum DuplicateFinder {
         groups.flatMap { Array($0.records.dropFirst()) }
     }
 
+    static func deletionCandidates(
+        in groups: [DuplicateGroup],
+        keeping keeperIDs: Set<String>
+    ) -> [ImageRecord] {
+        groups.flatMap { group in
+            let keeperID = group.records.first(where: { keeperIDs.contains($0.id) })?.id
+                ?? group.records.first?.id
+            return group.records.filter { $0.id != keeperID }
+        }
+    }
+
     static func qualityFirst(_ lhs: ImageRecord, _ rhs: ImageRecord) -> Bool {
         let lhsPixels = lhs.pixelWidth * lhs.pixelHeight
         let rhsPixels = rhs.pixelWidth * rhs.pixelHeight

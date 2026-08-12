@@ -11,6 +11,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var showingClosestResults = false
     @Published private(set) var mode: ContentMode = .ready
     @Published private(set) var queryImage: NSImage?
+    @Published private(set) var queryLabel = "Query image"
     @Published private(set) var isWorking = false
     @Published private(set) var isIndexing = false
     @Published private(set) var progress = 0.0
@@ -31,6 +32,10 @@ final class AppModel: ObservableObject {
     }
 
     func addDirectory() {
+        guard !isWorking else {
+            errorMessage = "Finish the current task or cancel indexing before changing the library."
+            return
+        }
         let panel = NSOpenPanel()
         panel.title = "Add Image Folder"
         panel.prompt = "Add Folder"
@@ -47,6 +52,10 @@ final class AppModel: ObservableObject {
     }
 
     func removeDirectory(_ path: String) {
+        guard !isWorking else {
+            errorMessage = "Finish the current task or cancel indexing before changing the library."
+            return
+        }
         config.directories.removeAll { $0 == path }
         records.removeAll { record in
             record.path == path || record.path.hasPrefix(path.hasSuffix("/") ? path : path + "/")
@@ -57,6 +66,10 @@ final class AppModel: ObservableObject {
     }
 
     func selectQueryImage() {
+        guard !isWorking else {
+            errorMessage = "Finish the current task or cancel indexing before starting a search."
+            return
+        }
         let panel = NSOpenPanel()
         panel.title = "Choose an Image"
         panel.prompt = "Search"
@@ -68,6 +81,10 @@ final class AppModel: ObservableObject {
     }
 
     func handleDroppedURL(_ url: URL) {
+        guard !isWorking else {
+            errorMessage = "Finish the current task or cancel indexing before starting a search."
+            return
+        }
         guard AppConstants.supportedExtensions.contains(url.pathExtension.lowercased()) else {
             errorMessage = "That image format is not supported."
             return
@@ -76,6 +93,10 @@ final class AppModel: ObservableObject {
     }
 
     func pasteImage() {
+        guard !isWorking else {
+            errorMessage = "Finish the current task or cancel indexing before starting a search."
+            return
+        }
         let pasteboard = NSPasteboard.general
         if let urls = pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL],
            let url = urls.first,
@@ -163,6 +184,7 @@ final class AppModel: ObservableObject {
             return
         }
         queryImage = image
+        queryLabel = url.lastPathComponent
         isWorking = true
         status = "Searching…"
         let currentRecords = records
@@ -186,7 +208,6 @@ final class AppModel: ObservableObject {
                 }.value
                 results = outcome.results
                 showingClosestResults = outcome.isClosestFallback
-                duplicateGroups = []
                 mode = .searchResults
                 status = outcome.isClosestFallback
                     ? "No matches · Showing \(outcome.results.count) closest images"
@@ -205,6 +226,7 @@ final class AppModel: ObservableObject {
             return
         }
         queryImage = image
+        queryLabel = "Pasted image"
         isWorking = true
         status = "Searching…"
         let currentRecords = records
@@ -226,7 +248,6 @@ final class AppModel: ObservableObject {
                 }.value
                 results = outcome.results
                 showingClosestResults = outcome.isClosestFallback
-                duplicateGroups = []
                 mode = .searchResults
                 status = outcome.isClosestFallback
                     ? "No matches · Showing \(outcome.results.count) closest images"
@@ -240,10 +261,12 @@ final class AppModel: ObservableObject {
     }
 
     func findDuplicates() {
+        guard !isWorking else { return }
         guard !records.isEmpty else {
             errorMessage = "The index is empty. Add a folder and index it first."
             return
         }
+        mode = .duplicates
         isWorking = true
         status = "Finding duplicates…"
         let snapshot = records
@@ -252,9 +275,6 @@ final class AppModel: ObservableObject {
             duplicateGroups = await Task.detached {
                 DuplicateFinder.groups(in: snapshot, directories: directories)
             }.value
-            results = []
-            showingClosestResults = false
-            mode = .duplicates
             status = duplicateGroups.isEmpty
                 ? "No duplicates found"
                 : "Found \(duplicateGroups.count) duplicate groups"
@@ -262,13 +282,20 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func moveDuplicatesToTrash() {
-        let candidates = DuplicateFinder.deletionCandidates(in: duplicateGroups)
+    func moveDuplicatesToTrash(keeping keeperIDs: Set<String>) {
+        let candidates = DuplicateFinder.deletionCandidates(
+            in: duplicateGroups,
+            keeping: keeperIDs
+        )
         guard !candidates.isEmpty else { return }
 
         let alert = NSAlert()
         alert.messageText = "Move \(candidates.count) duplicates to Trash?"
-        alert.informativeText = "Finder Sight will keep the highest-resolution image in each group."
+        let reclaimedSize = ByteCountFormatter.string(
+            fromByteCount: candidates.reduce(0) { $0 + $1.fileSize },
+            countStyle: .file
+        )
+        alert.informativeText = "Your selected image in each group will be kept. This can recover about \(reclaimedSize)."
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Move to Trash")
         alert.addButton(withTitle: "Cancel")
@@ -289,6 +316,10 @@ final class AppModel: ObservableObject {
     }
 
     func clearIndex() {
+        guard !isWorking else {
+            errorMessage = "Finish the current task or cancel indexing before clearing the index."
+            return
+        }
         let alert = NSAlert()
         alert.messageText = "Clear the local image index?"
         alert.informativeText = "Your original image files will not be deleted."
@@ -313,7 +344,33 @@ final class AppModel: ObservableObject {
         duplicateGroups = []
         showingClosestResults = false
         queryImage = nil
+        queryLabel = "Query image"
         mode = .ready
+    }
+
+    func clearSearch() {
+        results = []
+        showingClosestResults = false
+        queryImage = nil
+        queryLabel = "Query image"
+        mode = .ready
+        status = "Ready"
+    }
+
+    func activateSearch() {
+        mode = queryImage == nil ? .ready : .searchResults
+    }
+
+    func activateDuplicates() {
+        guard !records.isEmpty else {
+            errorMessage = "The index is empty. Add a folder and index it first."
+            return
+        }
+        if duplicateGroups.isEmpty {
+            findDuplicates()
+        } else {
+            mode = .duplicates
+        }
     }
 
     func reveal(_ path: String) {
@@ -327,6 +384,12 @@ final class AppModel: ObservableObject {
     func saveSettings() {
         config.similarityThreshold = min(100, max(0, config.similarityThreshold))
         config.maxResults = min(100, max(1, config.maxResults))
+        saveConfig()
+    }
+
+    func resetSearchSettings() {
+        config.similarityThreshold = AppConstants.defaultSimilarity
+        config.maxResults = AppConstants.defaultMaxResults
         saveConfig()
     }
 

@@ -125,6 +125,25 @@ final class FinderSightTests: XCTestCase {
         XCTAssertTrue(DuplicateFinder.qualityFirst(large, small))
     }
 
+    func testDuplicateCleanupRespectsSelectedKeeper() {
+        let recommended = ImageRecord(
+            path: "/recommended.jpg", hash: "same", modificationTime: 0,
+            pixelWidth: 500, pixelHeight: 500, fileSize: 500
+        )
+        let selected = ImageRecord(
+            path: "/selected.jpg", hash: "same", modificationTime: 0,
+            pixelWidth: 100, pixelHeight: 100, fileSize: 100
+        )
+        let group = DuplicateGroup(id: "same", records: [recommended, selected])
+
+        let candidates = DuplicateFinder.deletionCandidates(
+            in: [group],
+            keeping: [selected.id]
+        )
+
+        XCTAssertEqual(candidates.map(\.id), [recommended.id])
+    }
+
     func testVersionComparison() {
         XCTAssertTrue(UpdateService.isNewer("v0.2.0", than: "0.1.6"))
         XCTAssertFalse(UpdateService.isNewer("v0.1.6", than: "0.1.6"))

@@ -25,6 +25,12 @@ struct FinderSightApp: App {
                 Divider()
                 Button("Clear Index…") { model.clearIndex() }
             }
+            CommandMenu("Workspace") {
+                Button("Search") { model.activateSearch() }
+                    .keyboardShortcut("1", modifiers: .command)
+                Button("Duplicates") { model.activateDuplicates() }
+                    .keyboardShortcut("2", modifiers: .command)
+            }
             CommandGroup(replacing: .pasteboard) {
                 Button("Paste Image") { model.pasteImage() }
                     .keyboardShortcut("v", modifiers: .command)
