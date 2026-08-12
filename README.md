@@ -29,6 +29,7 @@ perceptual hashes and on-device Apple Vision features, then searches without upl
 - Hybrid perceptual-hash and Apple Vision similarity search
 - Border-aware full-image and regional visual matching
 - Finder reveal and native context menus
+- Move individual search results to the macOS Trash from their context menu
 - Dedicated Search and Duplicates workspaces with clear navigation
 - Exact duplicate groups with selectable keepers and storage-recovery estimates
 - Clear separation between true matches and closest fallback results

@@ -345,11 +345,19 @@ private struct SearchResultsGrid: View {
 
     var body: some View {
         if model.results.isEmpty {
-            EmptyState(
-                icon: "magnifyingglass",
-                title: "No Matches Found",
-                message: "Try lowering the minimum match score or adding more folders."
-            )
+            if model.status.hasPrefix("Moved ") {
+                EmptyState(
+                    icon: "trash",
+                    title: "Result Moved to Trash",
+                    message: "The file was removed from your results and local index."
+                )
+            } else {
+                EmptyState(
+                    icon: "magnifyingglass",
+                    title: "No Matches Found",
+                    message: "Try lowering the minimum match score or adding more folders."
+                )
+            }
         } else {
             VStack(alignment: .leading, spacing: 10) {
                 if model.showingClosestResults {
@@ -440,6 +448,10 @@ private struct ResultCard: View {
             Button("Copy Path") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(result.record.path, forType: .string)
+            }
+            Divider()
+            Button("Move to Trash…", role: .destructive) {
+                model.moveSearchResultToTrash(result)
             }
         }
     }

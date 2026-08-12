@@ -381,6 +381,38 @@ final class AppModel: ObservableObject {
         NSWorkspace.shared.open(URL(fileURLWithPath: path))
     }
 
+    func moveSearchResultToTrash(_ result: SearchResult) {
+        guard !isWorking else {
+            errorMessage = "Finish the current task or cancel indexing before moving a file to Trash."
+            return
+        }
+
+        let url = URL(fileURLWithPath: result.record.path)
+        let alert = NSAlert()
+        alert.messageText = "Move “\(url.lastPathComponent)” to Trash?"
+        alert.informativeText = "The file will be removed from the Finder Sight index. You can recover it from the Trash."
+        alert.alertStyle = .warning
+        let moveButton = alert.addButton(withTitle: "Move to Trash")
+        moveButton.hasDestructiveAction = true
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        do {
+            try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+            records.removeAll { $0.id == result.record.id }
+            results.removeAll { $0.id == result.id }
+            duplicateGroups = duplicateGroups.compactMap { group in
+                let remaining = group.records.filter { $0.id != result.record.id }
+                guard remaining.count > 1 else { return nil }
+                return DuplicateGroup(id: group.id, records: remaining)
+            }
+            saveIndex()
+            status = "Moved \(url.lastPathComponent) to Trash"
+        } catch {
+            errorMessage = "Couldn’t move \(url.lastPathComponent) to Trash: \(error.localizedDescription)"
+        }
+    }
+
     func saveSettings() {
         config.similarityThreshold = min(100, max(0, config.similarityThreshold))
         config.maxResults = min(100, max(1, config.maxResults))
