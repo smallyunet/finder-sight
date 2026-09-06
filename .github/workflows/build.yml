@@ -76,12 +76,12 @@ jobs:
         path: dist
 
     - name: Generate build provenance
-      uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.0.0
+      uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.0.0
       with:
         subject-path: dist/FinderSight-macOS.dmg
 
     - name: Create GitHub Release
-      uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+      uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
       with:
         files: |
           dist/FinderSight-macOS.dmg
